@@ -266,6 +266,43 @@ input:focus {
   display: none;
 }
 
+.btn-link {
+  width: 100%;
+  margin-top: 10px;
+  font-size: 0.9rem;
+}
+
+.ref-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 0.9rem;
+}
+
+.ref-table th,
+.ref-table td {
+  border: 1px solid var(--color-border);
+  padding: 6px 10px;
+  text-align: right;
+}
+
+.ref-table th:first-child,
+.ref-table td:first-child {
+  text-align: left;
+}
+
+.ref-table thead th {
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.ref-table tbody tr.highlight {
+  background: var(--color-accent-dark);
+  color: #fff;
+  font-weight: 600;
+}
+
 .history-header {
   display: flex;
   justify-content: space-between;

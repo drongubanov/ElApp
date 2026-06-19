@@ -1,5 +1,5 @@
 import { calculate, calculateVoltageDrop, NETWORK_TYPES } from './calculations.js';
-import { recommendProtection, INSTALLATION_LABELS } from './tables.js';
+import { recommendProtection, INSTALLATION_LABELS, CABLE_TABLE, CABLE_TABLE_SOURCE } from './tables.js';
 import { loadHistory, saveHistoryEntry, deleteHistoryEntry, clearHistory } from './history.js';
 import { formatPower, formatApparentPower, formatReactivePower, formatCurrent, formatDateTime } from './format.js';
 
@@ -46,6 +46,10 @@ const resBreaker = document.getElementById('res-breaker');
 const resCable = document.getElementById('res-cable');
 const resCorrection = document.getElementById('res-correction');
 const resVoltageDrop = document.getElementById('res-voltage-drop');
+const resPueCheck = document.getElementById('res-pue-check');
+const gotoRefTableBtn = document.getElementById('goto-ref-table-btn');
+const refTableSource = document.getElementById('ref-table-source');
+const refCableTableBody = document.getElementById('ref-cable-table-body');
 
 const historyList = document.getElementById('history-list');
 const historyEmpty = document.getElementById('history-empty');
@@ -88,6 +92,19 @@ pfPresetButtons.forEach((btn) => {
   btn.addEventListener('click', () => {
     pfInput.value = btn.dataset.pf;
   });
+});
+
+refTableSource.textContent = CABLE_TABLE_SOURCE;
+CABLE_TABLE.forEach((row) => {
+  const tr = document.createElement('tr');
+  tr.dataset.section = row.section;
+  tr.innerHTML = `<td>${row.section}</td><td>${row.copper}</td><td>${row.aluminum ?? '—'}</td>`;
+  refCableTableBody.appendChild(tr);
+});
+
+gotoRefTableBtn.addEventListener('click', () => {
+  switchTab('about');
+  refCableTableBody.querySelector('tr.highlight')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 });
 
 function showError(message) {
@@ -142,6 +159,22 @@ function renderResults(result, protection, line) {
       `${drop.drop.toFixed(2)} В (${drop.dropPercent.toFixed(2)}%) — ` +
       `${withinLimit ? 'в пределах общепринятой нормы (≤5%)' : 'превышает общепринятую норму (≤5%), увеличьте сечение'}.`;
     resVoltageDrop.classList.toggle('warn', !withinLimit);
+  }
+
+  refCableTableBody.querySelectorAll('tr.highlight').forEach((tr) => tr.classList.remove('highlight'));
+  const matchedSections = [protection.copperCable?.section, protection.aluminumCable?.section].filter((s) => s != null);
+  matchedSections.forEach((section) => {
+    refCableTableBody.querySelector(`tr[data-section="${section}"]`)?.classList.add('highlight');
+  });
+
+  if (matchedSections.length) {
+    resPueCheck.textContent =
+      `✓ Соответствует таблице ПУЭ-7 (гл. 1.3): расчётный ток ${result.I.toFixed(2)} А не превышает ` +
+      'допустимый ток выбранного сечения — см. выделенную строку на вкладке «Справка».';
+    gotoRefTableBtn.hidden = false;
+  } else {
+    resPueCheck.textContent = '';
+    gotoRefTableBtn.hidden = true;
   }
 
   resultsSection.hidden = false;
