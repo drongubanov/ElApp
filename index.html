@@ -146,9 +146,9 @@
       <h2>Конструктор сети</h2>
       <p class="note">
         Соберите схему сети в виде дерева: корневой узел — точка ввода (главный щит), у него могут
-        быть дочерние узлы — следующие щиты или потребители, соединённые линиями (кабелями). Кликните
-        по блоку, чтобы открыть и отредактировать его параметры, добавить дочерний узел или удалить
-        его. Кнопка «Рассчитать сеть» подбирает автоматы и кабели для всех линий дерева.
+        быть дочерние узлы — следующие щиты или потребители, соединённые линиями (кабелями). У каждого
+        блока есть свои кнопки: ⚙ — открыть параметры, + — добавить дочерний узел, − — удалить узел.
+        Кнопка «Рассчитать сеть» подбирает автоматы и кабели для всех линий дерева.
       </p>
 
       <button type="button" id="calc-network-btn" class="btn-primary">Рассчитать сеть</button>
@@ -244,11 +244,6 @@
         <div class="field" id="node-kc-field" hidden>
           <label for="node-kc">Коэффициент одновременности дочерних узлов, Кс</label>
           <input type="number" id="node-kc" inputmode="decimal" step="0.05" min="0.1" max="1" value="1" />
-        </div>
-
-        <div class="network-actions">
-          <button type="button" id="add-child-btn" class="btn-secondary">+ Дочерний узел</button>
-          <button type="button" id="delete-node-btn" class="btn-secondary">Удалить узел</button>
         </div>
 
         <p class="error-message" id="node-error-message" role="alert"></p>

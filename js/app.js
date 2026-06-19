@@ -95,8 +95,6 @@ const nodeCableCountInput = document.getElementById('node-cable-count');
 const nodeCableLengthInput = document.getElementById('node-cable-length');
 const nodeKcField = document.getElementById('node-kc-field');
 const nodeKcInput = document.getElementById('node-kc');
-const addChildBtn = document.getElementById('add-child-btn');
-const deleteNodeBtn = document.getElementById('delete-node-btn');
 const nodeErrorMessage = document.getElementById('node-error-message');
 
 const nodeResultEl = document.getElementById('node-result');
@@ -235,6 +233,11 @@ function countDescendants(node) {
   return node.children.reduce((sum, child) => sum + 1 + countDescendants(child), 0);
 }
 
+function isDescendantOrSelf(node, id) {
+  if (node.id === id) return true;
+  return node.children.some((child) => isDescendantOrSelf(child, id));
+}
+
 function persistNetworkScheme() {
   if (networkTree) saveNetworkScheme({ tree: networkTree });
 }
@@ -269,6 +272,36 @@ function collectErrors(calcNode, acc = []) {
   return acc;
 }
 
+function addChildToNode(parentId) {
+  const parent = findNode(networkTree, parentId);
+  if (!parent) return;
+  const child = createNode();
+  parent.children.push(child);
+  selectedNodeId = child.id;
+  persistNetworkScheme();
+  renderTree();
+  renderPanel();
+}
+
+function deleteNode(id) {
+  if (id === networkTree.id) return;
+  const node = findNode(networkTree, id);
+  const parent = findParentNode(networkTree, id);
+  if (!node || !parent) return;
+  const descendants = countDescendants(node);
+  if (descendants > 0) {
+    const word = pluralize(descendants, 'дочерний узел', 'дочерних узла', 'дочерних узлов');
+    if (!confirm(`Удалить узел «${node.name}» и ${descendants} ${word}?`)) return;
+  }
+  parent.children = parent.children.filter((child) => child.id !== node.id);
+  if (isDescendantOrSelf(node, selectedNodeId)) {
+    selectedNodeId = parent.id;
+  }
+  persistNetworkScheme();
+  renderTree();
+  renderPanel();
+}
+
 function renderNodeEl(node) {
   const li = document.createElement('li');
 
@@ -276,17 +309,66 @@ function renderNodeEl(node) {
   wrap.className = 'net-node-wrap';
   if (node.children.length) wrap.classList.add('has-children');
 
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'net-node';
-  if (node.id === selectedNodeId) btn.classList.add('selected');
+  const isRoot = node.id === networkTree.id;
+
+  const card = document.createElement('div');
+  card.className = 'net-node';
+  card.setAttribute('role', 'button');
+  card.setAttribute('tabindex', '0');
+  if (node.id === selectedNodeId) card.classList.add('selected');
 
   const calc = lastCalcMap?.get(node.id);
-  if (calc?.error) btn.classList.add('has-error');
+  if (calc?.error) card.classList.add('has-error');
+
+  const header = document.createElement('div');
+  header.className = 'net-node-header';
 
   const tag = document.createElement('span');
   tag.className = 'net-node-tag';
   tag.textContent = nodeTag(node);
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'net-node-toolbar';
+
+  const paramsBtn = document.createElement('button');
+  paramsBtn.type = 'button';
+  paramsBtn.className = 'net-node-icon-btn net-node-params-btn';
+  paramsBtn.title = 'Параметры узла';
+  paramsBtn.setAttribute('aria-label', 'Параметры узла');
+  paramsBtn.textContent = '⚙';
+  paramsBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    selectNode(node.id);
+  });
+  toolbar.appendChild(paramsBtn);
+
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'net-node-icon-btn net-node-add-btn';
+  addBtn.title = 'Добавить дочерний узел';
+  addBtn.setAttribute('aria-label', 'Добавить дочерний узел');
+  addBtn.textContent = '+';
+  addBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    addChildToNode(node.id);
+  });
+  toolbar.appendChild(addBtn);
+
+  if (!isRoot) {
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'net-node-icon-btn net-node-delete-btn';
+    deleteBtn.title = 'Удалить узел';
+    deleteBtn.setAttribute('aria-label', 'Удалить узел');
+    deleteBtn.textContent = '−';
+    deleteBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      deleteNode(node.id);
+    });
+    toolbar.appendChild(deleteBtn);
+  }
+
+  header.append(tag, toolbar);
 
   const name = document.createElement('span');
   name.className = 'net-node-name';
@@ -296,7 +378,7 @@ function renderNodeEl(node) {
   meta.className = 'net-node-meta';
   meta.textContent = nodeMeta(node);
 
-  btn.append(tag, name, meta);
+  card.append(header, name, meta);
 
   if (calc) {
     const badge = document.createElement('span');
@@ -308,11 +390,17 @@ function renderNodeEl(node) {
       const breakerText = calc.protection.breaker ? `АВ ${calc.protection.breaker} А` : 'АВ вне диапазона';
       badge.textContent = `${formatCurrent(calc.result.I)} · ${breakerText}`;
     }
-    btn.appendChild(badge);
+    card.appendChild(badge);
   }
 
-  btn.addEventListener('click', () => selectNode(node.id));
-  wrap.appendChild(btn);
+  card.addEventListener('click', () => selectNode(node.id));
+  card.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      selectNode(node.id);
+    }
+  });
+  wrap.appendChild(card);
   li.appendChild(wrap);
 
   if (node.children.length) {
@@ -424,7 +512,6 @@ function renderPanel() {
 
   const isRoot = node.id === networkTree.id;
   nodeCableLegend.textContent = isRoot ? 'Вводной кабель' : 'Кабель от родительского узла';
-  deleteNodeBtn.hidden = isRoot;
   nodeKcField.hidden = node.children.length === 0;
 
   updateNodeLoadFieldsUI();
@@ -470,34 +557,6 @@ function onPanelChange() {
 ].forEach((el) => {
   el.addEventListener('input', onPanelChange);
   el.addEventListener('change', onPanelChange);
-});
-
-addChildBtn.addEventListener('click', () => {
-  const parent = findNode(networkTree, selectedNodeId);
-  if (!parent) return;
-  const child = createNode();
-  parent.children.push(child);
-  selectedNodeId = child.id;
-  persistNetworkScheme();
-  renderTree();
-  renderPanel();
-});
-
-deleteNodeBtn.addEventListener('click', () => {
-  if (selectedNodeId === networkTree.id) return;
-  const node = findNode(networkTree, selectedNodeId);
-  const parent = findParentNode(networkTree, selectedNodeId);
-  if (!node || !parent) return;
-  const descendants = countDescendants(node);
-  if (descendants > 0) {
-    const word = pluralize(descendants, 'дочерний узел', 'дочерних узла', 'дочерних узлов');
-    if (!confirm(`Удалить узел «${node.name}» и ${descendants} ${word}?`)) return;
-  }
-  parent.children = parent.children.filter((child) => child.id !== node.id);
-  selectedNodeId = parent.id;
-  persistNetworkScheme();
-  renderTree();
-  renderPanel();
 });
 
 calcNetworkBtn.addEventListener('click', () => {
