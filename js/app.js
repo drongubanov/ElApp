@@ -73,6 +73,7 @@ const clearHistoryBtn = document.getElementById('clear-history-btn');
 
 const networkTreeEl = document.getElementById('network-tree');
 const calcNetworkBtn = document.getElementById('calc-network-btn');
+const resetNetworkBtn = document.getElementById('reset-network-btn');
 const networkErrorMessage = document.getElementById('network-error-message');
 const networkPanel = document.getElementById('network-panel');
 const netPanelTitle = document.getElementById('net-panel-title');
@@ -244,6 +245,18 @@ function isDescendantOrSelf(node, id) {
   return node.children.some((child) => isDescendantOrSelf(child, id));
 }
 
+/** ID узла и всех его предков вплоть до корня — путь, который подсвечивается при наведении. */
+function getAncestorChainIds(id) {
+  const ids = new Set();
+  let currentId = id;
+  while (currentId) {
+    ids.add(currentId);
+    const parent = findParentNode(networkTree, currentId);
+    currentId = parent ? parent.id : null;
+  }
+  return ids;
+}
+
 function persistNetworkScheme() {
   if (networkTree) saveNetworkScheme({ tree: networkTree });
 }
@@ -313,7 +326,10 @@ function renderNodeEl(node) {
 
   const wrap = document.createElement('div');
   wrap.className = 'net-node-wrap';
+  wrap.dataset.id = node.id;
   if (node.children.length) wrap.classList.add('has-children');
+  wrap.addEventListener('mouseenter', () => highlightHoverPath(node.id));
+  wrap.addEventListener('mouseleave', clearHoverPath);
 
   const isRoot = node.id === networkTree.id;
 
@@ -470,9 +486,32 @@ function drawConnectors() {
       const path = document.createElementNS(SVG_NS, 'path');
       path.setAttribute('class', 'net-connector');
       path.setAttribute('d', `M ${px} ${py} C ${px} ${midY}, ${cx} ${midY}, ${cx} ${cy}`);
+      path.dataset.parent = wrap.dataset.id;
+      path.dataset.child = childWrap.dataset.id;
       svg.appendChild(path);
     });
   });
+}
+
+/**
+ * При наведении на узел подсвечивает цепочку «узел → ... → корень»: сами
+ * блоки и соединяющие их линии остаются полностью видимыми, а всё
+ * остальное дерево затухает (см. .is-hovering / .on-hover-path в CSS).
+ */
+function highlightHoverPath(id) {
+  const chain = getAncestorChainIds(id);
+  networkTreeEl.classList.add('is-hovering');
+  networkTreeEl.querySelectorAll('.net-node-wrap').forEach((wrap) => {
+    wrap.classList.toggle('on-hover-path', chain.has(wrap.dataset.id));
+  });
+  networkTreeEl.querySelectorAll('.net-connector').forEach((path) => {
+    path.classList.toggle('on-hover-path', chain.has(path.dataset.child));
+  });
+}
+
+function clearHoverPath() {
+  networkTreeEl.classList.remove('is-hovering');
+  networkTreeEl.querySelectorAll('.on-hover-path').forEach((el) => el.classList.remove('on-hover-path'));
 }
 
 function updateNodeLoadFieldsUI() {
@@ -622,6 +661,17 @@ calcNetworkBtn.addEventListener('click', () => {
   lastCalcMap = flattenCalc(resultTree);
   const errors = collectErrors(resultTree);
   networkErrorMessage.textContent = errors.length ? `Не удалось рассчитать: ${errors.join('; ')}.` : '';
+  renderTree();
+  renderPanel();
+});
+
+resetNetworkBtn.addEventListener('click', () => {
+  if (!confirm('Удалить все узлы и параметры сети и начать сначала?')) return;
+  networkTree = buildDefaultTree();
+  selectedNodeId = networkTree.id;
+  lastCalcMap = null;
+  networkErrorMessage.textContent = '';
+  persistNetworkScheme();
   renderTree();
   renderPanel();
 });
