@@ -1,0 +1,10 @@
+{
+  "name": "elapp",
+  "version": "1.0.0",
+  "description": "Калькулятор мощности и тока для сетей постоянного и переменного тока",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\""
+  }
+}
