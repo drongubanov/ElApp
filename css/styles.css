@@ -86,14 +86,23 @@ main {
   margin: 0 auto;
 }
 
-#tab-network > .note,
-#tab-network > .disclaimer,
-#tab-network > #calc-network-btn,
-#tab-network > #network-error-message,
-#tab-network > .net-panel {
-  max-width: 640px;
-  margin-left: auto;
-  margin-right: auto;
+/* Вкладка сети: все блоки используют всю доступную ширину main (до 1280px),
+   без выборочного сужения — иначе блоки выравниваются по разным краям. */
+.net-panel select,
+.net-panel input[type='number'] {
+  max-width: 360px;
+}
+
+#node-load-fields,
+.net-panel .field-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 20px;
+}
+
+#node-load-fields > .field,
+.net-panel .field-group > .field {
+  flex: 1 1 240px;
 }
 
 .field {
@@ -227,7 +236,7 @@ input:focus {
 
 .result-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
   margin-bottom: 20px;
 }
@@ -470,8 +479,8 @@ input:focus {
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
-  min-width: 170px;
-  max-width: 240px;
+  min-width: 130px;
+  max-width: 190px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -508,7 +517,7 @@ input:focus {
 .net-node-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
   width: 100%;
 }

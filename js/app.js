@@ -368,7 +368,7 @@ function renderNodeEl(node) {
     toolbar.appendChild(deleteBtn);
   }
 
-  header.append(tag, toolbar);
+  header.append(toolbar);
 
   const name = document.createElement('span');
   name.className = 'net-node-name';
@@ -378,7 +378,7 @@ function renderNodeEl(node) {
   meta.className = 'net-node-meta';
   meta.textContent = nodeMeta(node);
 
-  card.append(header, name, meta);
+  card.append(header, tag, name, meta);
 
   if (calc) {
     const badge = document.createElement('span');
