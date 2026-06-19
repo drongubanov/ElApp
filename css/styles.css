@@ -421,10 +421,28 @@ input:focus {
 
 .net-tree {
   min-width: max-content;
+  position: relative;
+}
+
+/* SVG-слой с плавными bezier-линиями кабелей, соединяющими блоки.
+   Лежит под узлами и не перехватывает клики. */
+.net-connectors {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 0;
+}
+
+.net-connector {
+  fill: none;
+  stroke: var(--color-border);
+  stroke-width: 1.5;
 }
 
 .net-tree ul {
-  padding-top: 28px;
+  padding-top: 36px;
   position: relative;
 }
 
@@ -436,48 +454,15 @@ input:focus {
   padding: 0 14px;
 }
 
-.net-tree ul li::before {
-  content: '';
-  position: absolute;
-  top: -28px;
-  left: 50%;
-  width: 1px;
-  height: 28px;
-  background: var(--color-border);
-}
-
-.net-tree ul::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 14px;
-  right: 14px;
-  height: 1px;
-  background: var(--color-border);
-}
-
-.net-tree li:only-child > ul::before {
-  display: none;
-}
-
 .net-node-wrap {
   position: relative;
-}
-
-.net-node-wrap.has-children::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  width: 1px;
-  height: 28px;
-  background: var(--color-border);
+  z-index: 1;
 }
 
 .net-node {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 4px;
   min-width: 130px;
   max-width: 190px;
@@ -487,7 +472,7 @@ input:focus {
   padding: 10px 14px;
   color: var(--color-text);
   font: inherit;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
   transition: border-color 0.15s, transform 0.1s;
 }
@@ -517,7 +502,7 @@ input:focus {
 .net-node-header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 8px;
   width: 100%;
 }
