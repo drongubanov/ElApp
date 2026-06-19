@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ElApp — расчёт мощности и тока</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>⚡ ElApp</h1>
+    <p class="subtitle">Расчёт мощности и тока в сетях постоянного и переменного тока</p>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab-btn active" data-tab="calc" role="tab" aria-selected="true">Калькулятор</button>
+    <button class="tab-btn" data-tab="history" role="tab" aria-selected="false">История</button>
+    <button class="tab-btn" data-tab="about" role="tab" aria-selected="false">Справка</button>
+  </nav>
+
+  <main>
+    <section id="tab-calc" class="tab-panel active">
+      <form id="calc-form" novalidate>
+        <div class="field">
+          <label for="network-type">Тип сети</label>
+          <select id="network-type">
+            <option value="dc">Постоянный ток (DC)</option>
+            <option value="ac1" selected>Однофазная сеть переменного тока (1 фаза)</option>
+            <option value="ac3">Трёхфазная сеть переменного тока (3 фазы)</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="voltage">Напряжение, U (В)</label>
+          <input type="number" id="voltage" inputmode="decimal" step="any" min="0" placeholder="220" required />
+        </div>
+
+        <div class="field" id="pf-field">
+          <label for="power-factor">Коэффициент мощности, cos φ</label>
+          <input type="number" id="power-factor" inputmode="decimal" step="0.01" min="0.01" max="1" value="1" />
+          <div class="pf-presets">
+            <button type="button" class="pf-preset" data-pf="1">1.0</button>
+            <button type="button" class="pf-preset" data-pf="0.95">0.95</button>
+            <button type="button" class="pf-preset" data-pf="0.8">0.8</button>
+            <button type="button" class="pf-preset" data-pf="0.7">0.7</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="field-label">Известная величина</span>
+          <div class="radio-group">
+            <label><input type="radio" name="known" value="power" checked /> Мощность</label>
+            <label><input type="radio" name="known" value="current" /> Ток</label>
+          </div>
+        </div>
+
+        <div class="field" id="power-field">
+          <label for="power-value">Активная мощность, P</label>
+          <div class="input-with-unit">
+            <input type="number" id="power-value" inputmode="decimal" step="any" min="0" placeholder="1" />
+            <select id="power-unit">
+              <option value="1">Вт</option>
+              <option value="1000" selected>кВт</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field" id="current-field" hidden>
+          <label for="current-value">Ток, I (А)</label>
+          <input type="number" id="current-value" inputmode="decimal" step="any" min="0" placeholder="10" />
+        </div>
+
+        <button type="submit" class="btn-primary">Рассчитать</button>
+        <p class="error-message" id="error-message" role="alert"></p>
+      </form>
+
+      <section id="results" class="results" hidden>
+        <h2>Результат</h2>
+        <div class="result-grid">
+          <div class="result-card">
+            <span>Активная мощность, P</span>
+            <strong id="res-p"></strong>
+          </div>
+          <div class="result-card">
+            <span>Полная мощность, S</span>
+            <strong id="res-s"></strong>
+          </div>
+          <div class="result-card">
+            <span>Реактивная мощность, Q</span>
+            <strong id="res-q"></strong>
+          </div>
+          <div class="result-card">
+            <span>Ток, I</span>
+            <strong id="res-i"></strong>
+          </div>
+        </div>
+
+        <div class="recommendation">
+          <h3>Рекомендации по защите и кабелю</h3>
+          <p id="res-breaker"></p>
+          <p id="res-cable"></p>
+          <p class="disclaimer">
+            Справочные значения для предварительной ориентировки (таблицы для проводов с ПВХ-изоляцией,
+            прокладка в воздухе). Окончательный выбор автоматического выключателя и сечения кабеля выполняйте
+            по актуальным таблицам ПУЭ/ГОСТ с учётом способа прокладки, температуры, длины линии и
+            количества кабелей в пучке, либо доверьте расчёт специалисту.
+          </p>
+        </div>
+      </section>
+    </section>
+
+    <section id="tab-history" class="tab-panel">
+      <div class="history-header">
+        <h2>История расчётов</h2>
+        <button id="clear-history-btn" class="btn-secondary" type="button">Очистить историю</button>
+      </div>
+      <ul id="history-list" class="history-list"></ul>
+      <p id="history-empty" class="empty-state">История пуста — выполните расчёт на вкладке «Калькулятор».</p>
+    </section>
+
+    <section id="tab-about" class="tab-panel">
+      <h2>Используемые формулы</h2>
+      <article class="formula-block">
+        <h3>Постоянный ток (DC)</h3>
+        <p><code>P = U · I</code></p>
+      </article>
+      <article class="formula-block">
+        <h3>Однофазная сеть переменного тока (AC, 1 фаза)</h3>
+        <p><code>S = U · I</code></p>
+        <p><code>P = U · I · cos φ</code></p>
+        <p><code>Q = √(S² − P²)</code></p>
+      </article>
+      <article class="formula-block">
+        <h3>Трёхфазная сеть переменного тока (AC, 3 фазы)</h3>
+        <p><code>S = √3 · U<sub>л</sub> · I<sub>л</sub></code></p>
+        <p><code>P = √3 · U<sub>л</sub> · I<sub>л</sub> · cos φ</code></p>
+        <p><code>Q = √(S² − P²)</code></p>
+        <p class="note">U<sub>л</sub> — линейное (межфазное) напряжение, I<sub>л</sub> — линейный ток, нагрузка считается симметричной.</p>
+      </article>
+      <article class="formula-block">
+        <h3>Обозначения</h3>
+        <p>P — активная мощность (Вт), S — полная мощность (ВА), Q — реактивная мощность (вар), U — напряжение (В), I — ток (А), cos φ — коэффициент мощности.</p>
+      </article>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>Расчёты выполняются локально в браузере. Данные не передаются на сервер.</p>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
