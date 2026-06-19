@@ -1,7 +1,9 @@
 // Справочные таблицы допустимых токовых нагрузок кабелей и номинальных
 // токов автоматических выключателей. Значения приближены к таблицам ПУЭ
-// (двухжильные провода/кабели с ПВХ-изоляцией, прокладка в воздухе) и
-// предназначены только для предварительной ориентировки.
+// гл. 1.3 (двухжильные провода/кабели с ПВХ-изоляцией, базовая прокладка —
+// одиночный кабель открыто в воздухе) и предназначены только для
+// предварительной ориентировки. Способ прокладки и число кабелей рядом
+// учитываются приближёнными поправочными коэффициентами.
 
 export const CABLE_TABLE = [
   { section: 1.5, copper: 19, aluminum: null },
@@ -34,16 +36,53 @@ export function selectCable(current, material) {
   return row ? { section: row.section, ratedCurrent: row[material] } : null;
 }
 
+export const INSTALLATION_METHODS = {
+  AIR: 'air',
+  CONDUIT: 'conduit',
+  TRAY: 'tray',
+};
+
+export const INSTALLATION_LABELS = {
+  [INSTALLATION_METHODS.AIR]: 'Открыто в воздухе',
+  [INSTALLATION_METHODS.CONDUIT]: 'В трубе / кабель-канале / штукатурке',
+  [INSTALLATION_METHODS.TRAY]: 'На лотке / в пучке',
+};
+
+// Приближённые поправочные коэффициенты к базовой таблице (одиночный
+// кабель открыто в воздухе). Условные значения для предварительной
+// оценки — для точного проектирования используйте полные таблицы ПУЭ
+// гл. 1.3 (1.3.4–1.3.12) с учётом реальных условий прокладки.
+const INSTALLATION_FACTORS = {
+  [INSTALLATION_METHODS.AIR]: 1,
+  [INSTALLATION_METHODS.CONDUIT]: 0.85,
+  [INSTALLATION_METHODS.TRAY]: 0.9,
+};
+
+// Поправочный коэффициент на число кабелей, проложенных рядом друг с другом.
+const GROUPING_FACTORS = [1, 0.9, 0.85, 0.8, 0.78, 0.75];
+
+function groupingFactor(cableCount) {
+  const count = Math.max(1, Math.round(cableCount || 1));
+  return GROUPING_FACTORS[Math.min(count, GROUPING_FACTORS.length) - 1];
+}
+
 /**
  * Подбирает автомат по расчётному току и кабели (медь/алюминий), способные
  * выдержать ток самого автомата — это гарантирует, что автомат защищает кабель.
+ * Учитывает приближённые поправочные коэффициенты на способ прокладки и
+ * количество кабелей, проложенных рядом (см. INSTALLATION_FACTORS).
  */
-export function recommendProtection(current) {
+export function recommendProtection(current, { installationMethod = INSTALLATION_METHODS.AIR, cableCount = 1 } = {}) {
+  const methodFactor = INSTALLATION_FACTORS[installationMethod] ?? 1;
+  const groupFactor = groupingFactor(cableCount);
+  const correction = methodFactor * groupFactor;
+
   const breaker = selectBreaker(current);
-  const target = breaker ?? current;
+  const target = (breaker ?? current) / correction;
   return {
     current,
     breaker,
+    correction,
     copperCable: selectCable(target, 'copper'),
     aluminumCable: selectCable(target, 'aluminum'),
   };

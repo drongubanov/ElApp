@@ -1,7 +1,9 @@
-import { calculate, NETWORK_TYPES } from './calculations.js';
-import { recommendProtection } from './tables.js';
+import { calculate, calculateVoltageDrop, NETWORK_TYPES } from './calculations.js';
+import { recommendProtection, INSTALLATION_LABELS } from './tables.js';
 import { loadHistory, saveHistoryEntry, deleteHistoryEntry, clearHistory } from './history.js';
 import { formatPower, formatApparentPower, formatReactivePower, formatCurrent, formatDateTime } from './format.js';
+
+const VOLTAGE_DROP_LIMIT_PERCENT = 5;
 
 const NETWORK_LABELS = {
   [NETWORK_TYPES.DC]: 'Постоянный ток',
@@ -30,6 +32,9 @@ const powerValueInput = document.getElementById('power-value');
 const powerUnitSelect = document.getElementById('power-unit');
 const currentField = document.getElementById('current-field');
 const currentValueInput = document.getElementById('current-value');
+const installationMethodSelect = document.getElementById('installation-method');
+const cableCountInput = document.getElementById('cable-count');
+const cableLengthInput = document.getElementById('cable-length');
 const errorMessage = document.getElementById('error-message');
 const resultsSection = document.getElementById('results');
 
@@ -39,6 +44,8 @@ const resQ = document.getElementById('res-q');
 const resI = document.getElementById('res-i');
 const resBreaker = document.getElementById('res-breaker');
 const resCable = document.getElementById('res-cable');
+const resCorrection = document.getElementById('res-correction');
+const resVoltageDrop = document.getElementById('res-voltage-drop');
 
 const historyList = document.getElementById('history-list');
 const historyEmpty = document.getElementById('history-empty');
@@ -88,7 +95,7 @@ function showError(message) {
   resultsSection.hidden = true;
 }
 
-function renderResults(result, protection) {
+function renderResults(result, protection, line) {
   resP.textContent = formatPower(result.P);
   resS.textContent = formatApparentPower(result.S);
   resQ.textContent = formatReactivePower(result.Q);
@@ -108,6 +115,34 @@ function renderResults(result, protection) {
   resCable.textContent = cableParts.length
     ? `Рекомендуемое сечение кабеля: ${cableParts.join('; ')}`
     : 'Расчётный ток превышает диапазон табличных сечений — требуется индивидуальный подбор кабеля.';
+
+  const methodLabel = INSTALLATION_LABELS[line.installationMethod] ?? '';
+  resCorrection.textContent = protection.correction < 1
+    ? `Условия прокладки: ${methodLabel}, кабелей рядом — ${line.cableCount} (поправочный коэффициент ×${protection.correction.toFixed(2)}).`
+    : `Условия прокладки: ${methodLabel}, кабелей рядом — ${line.cableCount}.`;
+
+  resVoltageDrop.textContent = '';
+  resVoltageDrop.classList.remove('warn');
+  const dropCable = protection.copperCable ?? protection.aluminumCable;
+  if (line.cableLength > 0 && dropCable) {
+    const material = protection.copperCable ? 'copper' : 'aluminum';
+    const drop = calculateVoltageDrop({
+      networkType: result.networkType,
+      voltage: result.voltage,
+      current: result.I,
+      length: line.cableLength,
+      section: dropCable.section,
+      material,
+      powerFactor: result.powerFactor,
+    });
+    const withinLimit = drop.dropPercent <= VOLTAGE_DROP_LIMIT_PERCENT;
+    const materialLabel = material === 'copper' ? 'медь' : 'алюминий';
+    resVoltageDrop.textContent =
+      `Потеря напряжения на линии ${line.cableLength} м (сечение ${dropCable.section} мм², ${materialLabel}): ` +
+      `${drop.drop.toFixed(2)} В (${drop.dropPercent.toFixed(2)}%) — ` +
+      `${withinLimit ? 'в пределах общепринятой нормы (≤5%)' : 'превышает общепринятую норму (≤5%), увеличьте сечение'}.`;
+    resVoltageDrop.classList.toggle('warn', !withinLimit);
+  }
 
   resultsSection.hidden = false;
 }
@@ -157,16 +192,19 @@ function renderHistory() {
   });
 }
 
-function runCalculation({ networkType, voltage, powerFactor, known, knownValue }, { persist }) {
+function runCalculation(
+  { networkType, voltage, powerFactor, known, knownValue, installationMethod, cableCount, cableLength },
+  { persist },
+) {
   errorMessage.textContent = '';
   try {
     const result = calculate({ networkType, voltage, powerFactor, known, knownValue });
-    const protection = recommendProtection(result.I);
-    renderResults(result, protection);
+    const protection = recommendProtection(result.I, { installationMethod, cableCount });
+    renderResults(result, protection, { installationMethod, cableCount, cableLength });
 
     if (persist) {
       saveHistoryEntry({
-        input: { networkType, voltage, powerFactor, known, knownValue },
+        input: { networkType, voltage, powerFactor, known, knownValue, installationMethod, cableCount, cableLength },
         summary: buildHistorySummary(result),
       });
       renderHistory();
@@ -190,8 +228,14 @@ function restoreFromHistory(entry) {
   } else {
     currentValueInput.value = input.knownValue;
   }
+  const installationMethod = input.installationMethod ?? 'air';
+  const cableCount = input.cableCount ?? 1;
+  const cableLength = input.cableLength ?? 0;
+  installationMethodSelect.value = installationMethod;
+  cableCountInput.value = cableCount;
+  cableLengthInput.value = cableLength || '';
   switchTab('calc');
-  runCalculation(input, { persist: false });
+  runCalculation({ ...input, installationMethod, cableCount, cableLength }, { persist: false });
 }
 
 clearHistoryBtn.addEventListener('click', () => {
@@ -211,8 +255,14 @@ form.addEventListener('submit', (event) => {
   const knownValue = known === 'power'
     ? Number(powerValueInput.value) * Number(powerUnitSelect.value)
     : Number(currentValueInput.value);
+  const installationMethod = installationMethodSelect.value;
+  const cableCount = Number(cableCountInput.value) || 1;
+  const cableLength = Number(cableLengthInput.value) || 0;
 
-  runCalculation({ networkType, voltage, powerFactor, known, knownValue }, { persist: true });
+  runCalculation(
+    { networkType, voltage, powerFactor, known, knownValue, installationMethod, cableCount, cableLength },
+    { persist: true },
+  );
 });
 
 renderHistory();

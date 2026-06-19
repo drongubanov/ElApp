@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculate, NETWORK_TYPES } from '../js/calculations.js';
+import { calculate, calculateVoltageDrop, NETWORK_TYPES } from '../js/calculations.js';
 
 test('DC: ток по известной мощности', () => {
   const r = calculate({ networkType: NETWORK_TYPES.DC, voltage: 24, known: 'power', knownValue: 240 });
@@ -50,4 +50,37 @@ test('Ошибка: некорректный cosφ вне диапазона (0,
 
 test('Ошибка: неизвестный тип сети', () => {
   assert.throws(() => calculate({ networkType: 'foo', voltage: 220, known: 'power', knownValue: 100 }));
+});
+
+test('calculateVoltageDrop: DC, медь — потеря напряжения по формуле ΔU = 2·ρ·L·I/S', () => {
+  const r = calculateVoltageDrop({
+    networkType: NETWORK_TYPES.DC,
+    voltage: 24,
+    current: 10,
+    length: 20,
+    section: 2.5,
+    material: 'copper',
+  });
+  assert.ok(Math.abs(r.drop - 2.8) < 1e-9);
+  assert.ok(Math.abs(r.dropPercent - (2.8 / 24) * 100) < 1e-9);
+});
+
+test('calculateVoltageDrop: трёхфазная сеть учитывает √3 и cosφ', () => {
+  const r = calculateVoltageDrop({
+    networkType: NETWORK_TYPES.AC3,
+    voltage: 380,
+    current: 10,
+    length: 50,
+    section: 10,
+    material: 'copper',
+    powerFactor: 0.8,
+  });
+  const expectedDrop = (Math.sqrt(3) * 0.0175 * 50 * 10 * 0.8) / 10;
+  assert.ok(Math.abs(r.drop - expectedDrop) < 1e-9);
+});
+
+test('calculateVoltageDrop: ошибка при нулевой длине или неизвестном материале', () => {
+  const base = { networkType: NETWORK_TYPES.DC, voltage: 24, current: 10, section: 2.5 };
+  assert.throws(() => calculateVoltageDrop({ ...base, length: 0, material: 'copper' }));
+  assert.throws(() => calculateVoltageDrop({ ...base, length: 10, material: 'unobtainium' }));
 });

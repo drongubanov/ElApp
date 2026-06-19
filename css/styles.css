@@ -137,6 +137,19 @@ input:focus {
   border-color: var(--color-accent);
 }
 
+.field-group {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px 14px 4px;
+  margin-bottom: 18px;
+}
+
+.field-group legend {
+  padding: 0 6px;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
 .radio-group {
   display: flex;
   gap: 20px;
@@ -237,6 +250,20 @@ input:focus {
   color: var(--color-text-muted);
   font-size: 0.8rem;
   margin-bottom: 0;
+}
+
+.note-line {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin: 6px 0;
+}
+
+.note-line.warn {
+  color: var(--color-danger);
+}
+
+.note-line:empty {
+  display: none;
 }
 
 .history-header {
