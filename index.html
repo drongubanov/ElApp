@@ -145,96 +145,150 @@
     <section id="tab-network" class="tab-panel">
       <h2>Конструктор сети</h2>
       <p class="note">
-        Соберите будущую сеть из блоков потребителей одного щита/ввода: для каждого блока задайте
-        нагрузку и условия прокладки отходящей линии. Калькулятор подберёт автомат и кабель для каждого
-        блока, а также рассчитает суммарную нагрузку и подберёт вводной автомат и кабель.
+        Соберите схему сети в виде дерева: корневой узел — точка ввода (главный щит), у него могут
+        быть дочерние узлы — следующие щиты или потребители, соединённые линиями (кабелями). Кликните
+        по блоку, чтобы открыть и отредактировать его параметры, добавить дочерний узел или удалить
+        его. Кнопка «Рассчитать сеть» подбирает автоматы и кабели для всех линий дерева.
       </p>
 
-      <fieldset class="field-group">
-        <legend>Ввод (питание щита)</legend>
-
-        <div class="field">
-          <label for="net-main-network-type">Тип сети</label>
-          <select id="net-main-network-type">
-            <option value="dc">Постоянный ток (DC)</option>
-            <option value="ac1">Однофазная сеть переменного тока (1 фаза)</option>
-            <option value="ac3" selected>Трёхфазная сеть переменного тока (3 фазы)</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label for="net-main-voltage">Напряжение, U (В)</label>
-          <input type="number" id="net-main-voltage" inputmode="decimal" step="any" min="0" value="380" />
-        </div>
-
-        <div class="field">
-          <label for="net-main-installation">Способ прокладки вводного кабеля</label>
-          <select id="net-main-installation">
-            <option value="air" selected>Открыто в воздухе</option>
-            <option value="conduit">В трубе / кабель-канале / штукатурке</option>
-            <option value="tray">На лотке / в пучке</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label for="net-main-cable-count">Кабелей рядом, шт.</label>
-          <input type="number" id="net-main-cable-count" inputmode="numeric" step="1" min="1" value="1" />
-        </div>
-
-        <div class="field">
-          <label for="net-main-cable-length">Длина вводной линии, L (м)</label>
-          <input type="number" id="net-main-cable-length" inputmode="decimal" step="any" min="0" placeholder="не учитывать" />
-        </div>
-
-        <div class="field">
-          <label for="net-main-simultaneity">Коэффициент одновременности, Кс</label>
-          <input type="number" id="net-main-simultaneity" inputmode="decimal" step="0.05" min="0.1" max="1" value="1" />
-        </div>
-      </fieldset>
-
-      <div id="network-blocks"></div>
-
-      <div class="network-actions">
-        <button type="button" id="add-block-btn" class="btn-secondary">+ Добавить блок потребителя</button>
-        <button type="button" id="calc-network-btn" class="btn-primary">Рассчитать сеть</button>
-      </div>
+      <button type="button" id="calc-network-btn" class="btn-primary">Рассчитать сеть</button>
       <p class="error-message" id="network-error-message" role="alert"></p>
 
-      <section id="network-results" class="results" hidden>
-        <h2>Вводной автомат и кабель</h2>
-        <div class="result-grid">
-          <div class="result-card">
-            <span>Суммарная активная мощность, P</span>
-            <strong id="net-res-p"></strong>
+      <div class="net-tree-wrapper">
+        <ul class="net-tree" id="network-tree"></ul>
+      </div>
+
+      <section class="net-panel" id="network-panel">
+        <div class="net-panel-header">
+          <h3>Блок: <span id="net-panel-title"></span></h3>
+        </div>
+
+        <div class="field">
+          <label for="node-name">Название</label>
+          <input type="text" id="node-name" />
+        </div>
+
+        <label class="net-checkbox">
+          <input type="checkbox" id="node-has-own-load" />
+          Узел имеет собственную нагрузку
+        </label>
+
+        <div id="node-load-fields">
+          <div class="field">
+            <label for="node-network-type">Тип сети</label>
+            <select id="node-network-type">
+              <option value="dc">Постоянный ток (DC)</option>
+              <option value="ac1" selected>Однофазная сеть (1 фаза)</option>
+              <option value="ac3">Трёхфазная сеть (3 фазы)</option>
+            </select>
           </div>
-          <div class="result-card">
-            <span>Полная мощность, S</span>
-            <strong id="net-res-s"></strong>
+
+          <div class="field">
+            <label for="node-voltage">Напряжение, U (В)</label>
+            <input type="number" id="node-voltage" inputmode="decimal" step="any" min="0" placeholder="220" />
           </div>
-          <div class="result-card">
-            <span>Реактивная мощность, Q</span>
-            <strong id="net-res-q"></strong>
+
+          <div class="field" id="node-pf-field">
+            <label for="node-pf">Коэффициент мощности, cos φ</label>
+            <input type="number" id="node-pf" inputmode="decimal" step="0.01" min="0.01" max="1" value="1" />
           </div>
-          <div class="result-card">
-            <span>Расчётный ток, I</span>
-            <strong id="net-res-i"></strong>
+
+          <div class="field">
+            <span class="field-label">Известная величина</span>
+            <div class="radio-group">
+              <label><input type="radio" name="node-known" id="node-known-power" value="power" checked /> Мощность</label>
+              <label><input type="radio" name="node-known" id="node-known-current" value="current" /> Ток</label>
+            </div>
+          </div>
+
+          <div class="field" id="node-power-field">
+            <label>Активная мощность, P</label>
+            <div class="input-with-unit">
+              <input type="number" id="node-power-value" inputmode="decimal" step="any" min="0" placeholder="1" />
+              <select id="node-power-unit">
+                <option value="1">Вт</option>
+                <option value="1000" selected>кВт</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field" id="node-current-field" hidden>
+            <label for="node-current-value">Ток, I (А)</label>
+            <input type="number" id="node-current-value" inputmode="decimal" step="any" min="0" placeholder="10" />
           </div>
         </div>
 
-        <div class="recommendation">
-          <p id="net-res-breaker"></p>
-          <p id="net-res-cable"></p>
-          <p id="net-res-voltage-drop" class="note-line"></p>
-          <p id="net-res-selectivity" class="note-line"></p>
-          <p class="disclaimer">
-            Расчёт сети — предварительная оценка для эскизного проектирования: суммарная нагрузка
-            считается как сумма активных и реактивных мощностей блоков с учётом коэффициента
-            одновременности Кс, без учёта пусковых токов и реальной диаграммы нагрузки. Окончательный
-            выбор аппаратов защиты, сечений кабелей и проверку селективности выполняйте по полному
-            проекту электроснабжения или доверьте специалисту.
-          </p>
+        <fieldset class="field-group">
+          <legend id="node-cable-legend">Кабель от родительского узла</legend>
+
+          <div class="field">
+            <label for="node-installation">Способ прокладки</label>
+            <select id="node-installation">
+              <option value="air" selected>Открыто в воздухе</option>
+              <option value="conduit">В трубе / кабель-канале / штукатурке</option>
+              <option value="tray">На лотке / в пучке</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="node-cable-count">Кабелей рядом, шт.</label>
+            <input type="number" id="node-cable-count" inputmode="numeric" step="1" min="1" value="1" />
+          </div>
+
+          <div class="field">
+            <label for="node-cable-length">Длина линии, L (м)</label>
+            <input type="number" id="node-cable-length" inputmode="decimal" step="any" min="0" placeholder="не учитывать" />
+          </div>
+        </fieldset>
+
+        <div class="field" id="node-kc-field" hidden>
+          <label for="node-kc">Коэффициент одновременности дочерних узлов, Кс</label>
+          <input type="number" id="node-kc" inputmode="decimal" step="0.05" min="0.1" max="1" value="1" />
+        </div>
+
+        <div class="network-actions">
+          <button type="button" id="add-child-btn" class="btn-secondary">+ Дочерний узел</button>
+          <button type="button" id="delete-node-btn" class="btn-secondary">Удалить узел</button>
+        </div>
+
+        <p class="error-message" id="node-error-message" role="alert"></p>
+
+        <div class="net-panel-result" id="node-result" hidden>
+          <div class="result-grid">
+            <div class="result-card">
+              <span>Активная мощность, P</span>
+              <strong id="node-res-p"></strong>
+            </div>
+            <div class="result-card">
+              <span>Полная мощность, S</span>
+              <strong id="node-res-s"></strong>
+            </div>
+            <div class="result-card">
+              <span>Реактивная мощность, Q</span>
+              <strong id="node-res-q"></strong>
+            </div>
+            <div class="result-card">
+              <span>Расчётный ток, I</span>
+              <strong id="node-res-i"></strong>
+            </div>
+          </div>
+
+          <div class="recommendation">
+            <p id="node-res-breaker"></p>
+            <p id="node-res-cable"></p>
+            <p id="node-res-voltage-drop" class="note-line"></p>
+            <p id="node-res-selectivity" class="note-line"></p>
+          </div>
         </div>
       </section>
+
+      <p class="disclaimer">
+        Расчёт сети — предварительная оценка для эскизного проектирования: нагрузка каждого узла
+        складывается из его собственной нагрузки и суммарной нагрузки дочерних узлов с учётом
+        коэффициента одновременности, без учёта пусковых токов и реальной диаграммы нагрузки.
+        Окончательный выбор аппаратов защиты, сечений кабелей и проверку селективности выполняйте по
+        полному проекту электроснабжения или доверьте специалисту.
+      </p>
     </section>
 
     <section id="tab-history" class="tab-panel">

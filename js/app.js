@@ -1,6 +1,6 @@
 import { calculate, calculateVoltageDrop, NETWORK_TYPES } from './calculations.js';
 import { recommendProtection, INSTALLATION_LABELS, CABLE_TABLE, CABLE_TABLE_SOURCE } from './tables.js';
-import { calculateBlock, aggregateIncoming } from './network.js';
+import { calculateTree } from './network.js';
 import { loadNetworkScheme, saveNetworkScheme } from './networkStorage.js';
 import { loadHistory, saveHistoryEntry, deleteHistoryEntry, clearHistory } from './history.js';
 import { formatPower, formatApparentPower, formatReactivePower, formatCurrent, formatDateTime } from './format.js';
@@ -12,6 +12,20 @@ const NETWORK_LABELS = {
   [NETWORK_TYPES.AC1]: 'Однофазная сеть',
   [NETWORK_TYPES.AC3]: 'Трёхфазная сеть',
 };
+
+const NETWORK_SHORT_LABELS = {
+  [NETWORK_TYPES.DC]: 'DC',
+  [NETWORK_TYPES.AC1]: '1~',
+  [NETWORK_TYPES.AC3]: '3~',
+};
+
+function pluralize(n, one, few, many) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
 
 const VOLTAGE_PLACEHOLDERS = {
   [NETWORK_TYPES.DC]: '24',
@@ -57,25 +71,43 @@ const historyList = document.getElementById('history-list');
 const historyEmpty = document.getElementById('history-empty');
 const clearHistoryBtn = document.getElementById('clear-history-btn');
 
-const netMainNetworkType = document.getElementById('net-main-network-type');
-const netMainVoltage = document.getElementById('net-main-voltage');
-const netMainInstallation = document.getElementById('net-main-installation');
-const netMainCableCount = document.getElementById('net-main-cable-count');
-const netMainCableLength = document.getElementById('net-main-cable-length');
-const netMainSimultaneity = document.getElementById('net-main-simultaneity');
-const networkBlocksContainer = document.getElementById('network-blocks');
-const addBlockBtn = document.getElementById('add-block-btn');
+const networkTreeEl = document.getElementById('network-tree');
 const calcNetworkBtn = document.getElementById('calc-network-btn');
 const networkErrorMessage = document.getElementById('network-error-message');
-const networkResults = document.getElementById('network-results');
-const netResP = document.getElementById('net-res-p');
-const netResS = document.getElementById('net-res-s');
-const netResQ = document.getElementById('net-res-q');
-const netResI = document.getElementById('net-res-i');
-const netResBreaker = document.getElementById('net-res-breaker');
-const netResCable = document.getElementById('net-res-cable');
-const netResVoltageDrop = document.getElementById('net-res-voltage-drop');
-const netResSelectivity = document.getElementById('net-res-selectivity');
+const networkPanel = document.getElementById('network-panel');
+const netPanelTitle = document.getElementById('net-panel-title');
+
+const nodeNameInput = document.getElementById('node-name');
+const nodeHasOwnLoadInput = document.getElementById('node-has-own-load');
+const nodeLoadFields = document.getElementById('node-load-fields');
+const nodeNetworkTypeSelect = document.getElementById('node-network-type');
+const nodeVoltageInput = document.getElementById('node-voltage');
+const nodePfField = document.getElementById('node-pf-field');
+const nodePfInput = document.getElementById('node-pf');
+const nodePowerField = document.getElementById('node-power-field');
+const nodePowerValueInput = document.getElementById('node-power-value');
+const nodePowerUnitSelect = document.getElementById('node-power-unit');
+const nodeCurrentField = document.getElementById('node-current-field');
+const nodeCurrentValueInput = document.getElementById('node-current-value');
+const nodeCableLegend = document.getElementById('node-cable-legend');
+const nodeInstallationSelect = document.getElementById('node-installation');
+const nodeCableCountInput = document.getElementById('node-cable-count');
+const nodeCableLengthInput = document.getElementById('node-cable-length');
+const nodeKcField = document.getElementById('node-kc-field');
+const nodeKcInput = document.getElementById('node-kc');
+const addChildBtn = document.getElementById('add-child-btn');
+const deleteNodeBtn = document.getElementById('delete-node-btn');
+const nodeErrorMessage = document.getElementById('node-error-message');
+
+const nodeResultEl = document.getElementById('node-result');
+const nodeResP = document.getElementById('node-res-p');
+const nodeResS = document.getElementById('node-res-s');
+const nodeResQ = document.getElementById('node-res-q');
+const nodeResI = document.getElementById('node-res-i');
+const nodeResBreaker = document.getElementById('node-res-breaker');
+const nodeResCable = document.getElementById('node-res-cable');
+const nodeResVoltageDrop = document.getElementById('node-res-voltage-drop');
+const nodeResSelectivity = document.getElementById('node-res-selectivity');
 
 function switchTab(tabName) {
   tabButtons.forEach((btn) => {
@@ -129,217 +161,210 @@ gotoRefTableBtn.addEventListener('click', () => {
   refCableTableBody.querySelector('tr.highlight')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 });
 
-function blockTemplate(id) {
-  return `
-    <div class="network-block" data-id="${id}">
-      <div class="network-block-header">
-        <input type="text" class="block-name" value="Блок" aria-label="Название блока" />
-        <button type="button" class="remove-block-btn" aria-label="Удалить блок">✕</button>
-      </div>
-
-      <div class="field">
-        <label>Тип сети</label>
-        <select class="block-network-type">
-          <option value="dc">Постоянный ток (DC)</option>
-          <option value="ac1" selected>Однофазная сеть (1 фаза)</option>
-          <option value="ac3">Трёхфазная сеть (3 фазы)</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label>Напряжение, U (В)</label>
-        <input type="number" class="block-voltage" inputmode="decimal" step="any" min="0" placeholder="220" />
-      </div>
-
-      <div class="field block-pf-field">
-        <label>Коэффициент мощности, cos φ</label>
-        <input type="number" class="block-pf" inputmode="decimal" step="0.01" min="0.01" max="1" value="1" />
-      </div>
-
-      <div class="field">
-        <span class="field-label">Известная величина</span>
-        <div class="radio-group">
-          <label><input type="radio" name="block-known-${id}" class="block-known" value="power" checked /> Мощность</label>
-          <label><input type="radio" name="block-known-${id}" class="block-known" value="current" /> Ток</label>
-        </div>
-      </div>
-
-      <div class="field block-power-field">
-        <label>Активная мощность, P</label>
-        <div class="input-with-unit">
-          <input type="number" class="block-power-value" inputmode="decimal" step="any" min="0" placeholder="1" />
-          <select class="block-power-unit">
-            <option value="1">Вт</option>
-            <option value="1000" selected>кВт</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="field block-current-field" hidden>
-        <label>Ток, I (А)</label>
-        <input type="number" class="block-current-value" inputmode="decimal" step="any" min="0" placeholder="10" />
-      </div>
-
-      <div class="field">
-        <label>Способ прокладки</label>
-        <select class="block-installation">
-          <option value="air" selected>Открыто в воздухе</option>
-          <option value="conduit">В трубе / кабель-канале / штукатурке</option>
-          <option value="tray">На лотке / в пучке</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label>Кабелей рядом, шт.</label>
-        <input type="number" class="block-cable-count" inputmode="numeric" step="1" min="1" value="1" />
-      </div>
-
-      <div class="field">
-        <label>Длина линии, L (м)</label>
-        <input type="number" class="block-cable-length" inputmode="decimal" step="any" min="0" placeholder="не учитывать" />
-      </div>
-
-      <p class="block-error error-message"></p>
-      <div class="block-result note-line"></div>
-    </div>
-  `;
-}
-
-function applyBlockConfig(el, config) {
-  const known = config.known ?? 'power';
-  el.querySelector('.block-name').value = config.name ?? 'Блок';
-  el.querySelector('.block-network-type').value = config.networkType ?? NETWORK_TYPES.AC1;
-  el.querySelector('.block-voltage').value = config.voltage ?? '';
-  el.querySelector('.block-pf').value = config.powerFactor ?? 1;
-  el.querySelector(`.block-known[value="${known}"]`).checked = true;
-  if (known === 'power') {
-    el.querySelector('.block-power-unit').value = '1';
-    el.querySelector('.block-power-value').value = config.knownValue ?? '';
-  } else {
-    el.querySelector('.block-current-value').value = config.knownValue ?? '';
-  }
-  el.querySelector('.block-installation').value = config.installationMethod ?? 'air';
-  el.querySelector('.block-cable-count').value = config.cableCount ?? 1;
-  el.querySelector('.block-cable-length').value = config.cableLength || '';
-}
-
-function readBlockConfig(el) {
-  const known = el.querySelector('.block-known:checked').value;
-  const knownValue = known === 'power'
-    ? Number(el.querySelector('.block-power-value').value) * Number(el.querySelector('.block-power-unit').value)
-    : Number(el.querySelector('.block-current-value').value);
+function createNode(overrides = {}) {
   return {
-    id: el.dataset.id,
-    name: el.querySelector('.block-name').value || 'Блок',
-    networkType: el.querySelector('.block-network-type').value,
-    voltage: Number(el.querySelector('.block-voltage').value),
-    powerFactor: Number(el.querySelector('.block-pf').value),
-    known,
-    knownValue,
-    installationMethod: el.querySelector('.block-installation').value,
-    cableCount: Number(el.querySelector('.block-cable-count').value) || 1,
-    cableLength: Number(el.querySelector('.block-cable-length').value) || 0,
+    id: crypto.randomUUID(),
+    name: 'Новый узел',
+    networkType: NETWORK_TYPES.AC1,
+    voltage: 220,
+    powerFactor: 1,
+    hasOwnLoad: true,
+    known: 'power',
+    knownValue: 1000,
+    installationMethod: 'air',
+    cableCount: 1,
+    cableLength: 0,
+    simultaneityFactor: 1,
+    children: [],
+    ...overrides,
   };
 }
 
-let blockCounter = 0;
-
-function addBlockElement(config = null) {
-  blockCounter += 1;
-  const id = config?.id ?? `b${Date.now()}-${blockCounter}`;
-  const wrapper = document.createElement('div');
-  wrapper.innerHTML = blockTemplate(id).trim();
-  const el = wrapper.firstElementChild;
-
-  const blockNetworkTypeSelect = el.querySelector('.block-network-type');
-  const blockPfField = el.querySelector('.block-pf-field');
-  const blockKnownRadios = el.querySelectorAll('.block-known');
-  const blockPowerField = el.querySelector('.block-power-field');
-  const blockCurrentField = el.querySelector('.block-current-field');
-  const blockVoltageInput = el.querySelector('.block-voltage');
-
-  function updateBlockNetworkUI() {
-    blockPfField.hidden = blockNetworkTypeSelect.value === NETWORK_TYPES.DC;
-    blockVoltageInput.placeholder = VOLTAGE_PLACEHOLDERS[blockNetworkTypeSelect.value] ?? '';
-  }
-  function updateBlockKnownUI() {
-    const known = el.querySelector('.block-known:checked').value;
-    blockPowerField.hidden = known !== 'power';
-    blockCurrentField.hidden = known !== 'current';
-  }
-
-  blockNetworkTypeSelect.addEventListener('change', updateBlockNetworkUI);
-  blockKnownRadios.forEach((radio) => radio.addEventListener('change', updateBlockKnownUI));
-  el.querySelector('.remove-block-btn').addEventListener('click', () => {
-    el.remove();
-    persistNetworkScheme();
+function buildDefaultTree() {
+  return createNode({
+    name: 'Главный щит (ВРУ)',
+    networkType: NETWORK_TYPES.AC3,
+    voltage: 380,
+    hasOwnLoad: false,
+    simultaneityFactor: 0.8,
+    children: [
+      createNode({
+        name: 'Освещение',
+        networkType: NETWORK_TYPES.AC1,
+        voltage: 220,
+        knownValue: 1000,
+      }),
+      createNode({
+        name: 'Силовая группа',
+        networkType: NETWORK_TYPES.AC3,
+        voltage: 380,
+        powerFactor: 0.85,
+        known: 'current',
+        knownValue: 25,
+        installationMethod: 'conduit',
+        cableCount: 2,
+        cableLength: 15,
+      }),
+    ],
   });
+}
 
-  if (config) {
-    applyBlockConfig(el, config);
+let networkTree = null;
+let selectedNodeId = null;
+let lastCalcMap = null;
+
+function findNode(node, id) {
+  if (node.id === id) return node;
+  for (const child of node.children) {
+    const found = findNode(child, id);
+    if (found) return found;
   }
-  updateBlockNetworkUI();
-  updateBlockKnownUI();
-
-  networkBlocksContainer.appendChild(el);
-  return el;
+  return null;
 }
 
-function readMainConfig() {
-  return {
-    networkType: netMainNetworkType.value,
-    voltage: Number(netMainVoltage.value),
-    installationMethod: netMainInstallation.value,
-    cableCount: Number(netMainCableCount.value) || 1,
-    cableLength: Number(netMainCableLength.value) || 0,
-    simultaneityFactor: Number(netMainSimultaneity.value) || 1,
-  };
+function findParentNode(node, id) {
+  for (const child of node.children) {
+    if (child.id === id) return node;
+    const found = findParentNode(child, id);
+    if (found) return found;
+  }
+  return null;
 }
 
-function applyMainConfig(config) {
-  netMainNetworkType.value = config.networkType ?? NETWORK_TYPES.AC3;
-  netMainVoltage.value = config.voltage ?? 380;
-  netMainInstallation.value = config.installationMethod ?? 'air';
-  netMainCableCount.value = config.cableCount ?? 1;
-  netMainCableLength.value = config.cableLength || '';
-  netMainSimultaneity.value = config.simultaneityFactor ?? 1;
+function countDescendants(node) {
+  return node.children.reduce((sum, child) => sum + 1 + countDescendants(child), 0);
 }
 
 function persistNetworkScheme() {
-  const blocks = Array.from(networkBlocksContainer.querySelectorAll('.network-block')).map(readBlockConfig);
-  saveNetworkScheme({ main: readMainConfig(), blocks });
+  if (networkTree) saveNetworkScheme({ tree: networkTree });
 }
 
-function renderBlockResult(resultEl, block) {
-  const { result, protection, voltageDrop } = block;
-  const parts = [`${formatPower(result.P)}, ${formatCurrent(result.I)}`];
-  parts.push(protection.breaker ? `автомат ${protection.breaker} А` : 'ток вне диапазона таблицы автоматов');
+function nodeTag(node) {
+  const isRoot = node.id === networkTree.id;
+  if (isRoot) return 'Ввод';
+  if (node.children.length && node.hasOwnLoad) return 'Щит + нагрузка';
+  if (node.children.length) return 'Щит';
+  return 'Нагрузка';
+}
 
-  const cableParts = [];
-  if (protection.copperCable) cableParts.push(`медь ${protection.copperCable.section} мм²`);
-  if (protection.aluminumCable) cableParts.push(`алюминий ${protection.aluminumCable.section} мм²`);
-  parts.push(cableParts.length ? `кабель: ${cableParts.join('; ')}` : 'сечение вне диапазона таблицы');
+function nodeMeta(node) {
+  if (node.hasOwnLoad) return `${NETWORK_SHORT_LABELS[node.networkType] ?? ''} ${node.voltage} В`;
+  if (node.children.length) {
+    return `${node.children.length} ${pluralize(node.children.length, 'дочерний узел', 'дочерних узла', 'дочерних узлов')}`;
+  }
+  return '';
+}
 
-  let warn = false;
-  if (voltageDrop) {
-    warn = voltageDrop.dropPercent > VOLTAGE_DROP_LIMIT_PERCENT;
-    parts.push(`ΔU ${voltageDrop.drop.toFixed(2)} В (${voltageDrop.dropPercent.toFixed(2)}%)${warn ? ' — превышает норму ≤5%' : ''}`);
+function flattenCalc(calcNode, map = new Map()) {
+  map.set(calcNode.id, calcNode);
+  calcNode.children.forEach((child) => flattenCalc(child, map));
+  return map;
+}
+
+function collectErrors(calcNode, acc = []) {
+  if (calcNode.error && !calcNode.children.some((child) => child.error)) {
+    acc.push(`«${calcNode.name}»: ${calcNode.error}`);
+  }
+  calcNode.children.forEach((child) => collectErrors(child, acc));
+  return acc;
+}
+
+function renderNodeEl(node) {
+  const li = document.createElement('li');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'net-node-wrap';
+  if (node.children.length) wrap.classList.add('has-children');
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'net-node';
+  if (node.id === selectedNodeId) btn.classList.add('selected');
+
+  const calc = lastCalcMap?.get(node.id);
+  if (calc?.error) btn.classList.add('has-error');
+
+  const tag = document.createElement('span');
+  tag.className = 'net-node-tag';
+  tag.textContent = nodeTag(node);
+
+  const name = document.createElement('span');
+  name.className = 'net-node-name';
+  name.textContent = node.name;
+
+  const meta = document.createElement('span');
+  meta.className = 'net-node-meta';
+  meta.textContent = nodeMeta(node);
+
+  btn.append(tag, name, meta);
+
+  if (calc) {
+    const badge = document.createElement('span');
+    badge.className = 'net-node-badge';
+    if (calc.error) {
+      badge.classList.add('warn');
+      badge.textContent = 'ошибка расчёта';
+    } else {
+      const breakerText = calc.protection.breaker ? `АВ ${calc.protection.breaker} А` : 'АВ вне диапазона';
+      badge.textContent = `${formatCurrent(calc.result.I)} · ${breakerText}`;
+    }
+    btn.appendChild(badge);
   }
 
-  resultEl.textContent = parts.join(' · ');
-  resultEl.classList.toggle('warn', warn);
+  btn.addEventListener('click', () => selectNode(node.id));
+  wrap.appendChild(btn);
+  li.appendChild(wrap);
+
+  if (node.children.length) {
+    const ul = document.createElement('ul');
+    node.children.forEach((child) => ul.appendChild(renderNodeEl(child)));
+    li.appendChild(ul);
+  }
+
+  return li;
 }
 
-function renderIncomingResult(incoming, main) {
-  const { result, protection, voltageDrop, sumOfBlockBreakers } = incoming;
-  netResP.textContent = formatPower(result.P);
-  netResS.textContent = formatApparentPower(result.S);
-  netResQ.textContent = formatReactivePower(result.Q);
-  netResI.textContent = formatCurrent(result.I);
+function renderTree() {
+  networkTreeEl.innerHTML = '';
+  if (!networkTree) return;
+  networkTreeEl.appendChild(renderNodeEl(networkTree));
+}
 
-  netResBreaker.textContent = protection.breaker
-    ? `Рекомендуемый вводной автоматический выключатель: ${protection.breaker} А (расчётный ток ${result.I.toFixed(2)} А)`
-    : `Расчётный ток ввода (${result.I.toFixed(2)} А) превышает диапазон таблицы — требуется индивидуальный подбор оборудования.`;
+function updateNodeLoadFieldsUI() {
+  nodeLoadFields.hidden = !nodeHasOwnLoadInput.checked;
+}
+
+function updateNodeKnownFieldsUI() {
+  const known = document.querySelector('input[name="node-known"]:checked').value;
+  nodePowerField.hidden = known !== 'power';
+  nodeCurrentField.hidden = known !== 'current';
+  nodePfField.hidden = nodeNetworkTypeSelect.value === NETWORK_TYPES.DC;
+  nodeVoltageInput.placeholder = VOLTAGE_PLACEHOLDERS[nodeNetworkTypeSelect.value] ?? '';
+}
+
+function renderNodeResult(node) {
+  const calc = lastCalcMap?.get(node.id);
+  nodeErrorMessage.textContent = '';
+  if (!calc) {
+    nodeResultEl.hidden = true;
+    return;
+  }
+  if (calc.error) {
+    nodeErrorMessage.textContent = calc.error;
+    nodeResultEl.hidden = true;
+    return;
+  }
+
+  nodeResultEl.hidden = false;
+  const { result, protection, voltageDrop, sumOfChildBreakers } = calc;
+  nodeResP.textContent = formatPower(result.P);
+  nodeResS.textContent = formatApparentPower(result.S);
+  nodeResQ.textContent = formatReactivePower(result.Q);
+  nodeResI.textContent = formatCurrent(result.I);
+
+  nodeResBreaker.textContent = protection.breaker
+    ? `Рекомендуемый автоматический выключатель: ${protection.breaker} А (расчётный ток ${result.I.toFixed(2)} А)`
+    : `Расчётный ток (${result.I.toFixed(2)} А) превышает диапазон таблицы — требуется индивидуальный подбор оборудования.`;
 
   const cableParts = [];
   if (protection.copperCable) {
@@ -348,103 +373,149 @@ function renderIncomingResult(incoming, main) {
   if (protection.aluminumCable) {
     cableParts.push(`алюминий — ${protection.aluminumCable.section} мм² (доп. ток ${protection.aluminumCable.ratedCurrent} А)`);
   }
-  netResCable.textContent = cableParts.length
-    ? `Рекомендуемое сечение вводного кабеля: ${cableParts.join('; ')}`
+  nodeResCable.textContent = cableParts.length
+    ? `Рекомендуемое сечение кабеля: ${cableParts.join('; ')}`
     : 'Расчётный ток превышает диапазон табличных сечений — требуется индивидуальный подбор кабеля.';
 
-  netResVoltageDrop.textContent = '';
-  netResVoltageDrop.classList.remove('warn');
+  nodeResVoltageDrop.textContent = '';
+  nodeResVoltageDrop.classList.remove('warn');
   if (voltageDrop) {
     const withinLimit = voltageDrop.dropPercent <= VOLTAGE_DROP_LIMIT_PERCENT;
     const materialLabel = voltageDrop.material === 'copper' ? 'медь' : 'алюминий';
-    netResVoltageDrop.textContent =
-      `Потеря напряжения на вводной линии ${main.cableLength} м (сечение ${voltageDrop.section} мм², ${materialLabel}): ` +
+    nodeResVoltageDrop.textContent =
+      `Потеря напряжения на линии ${node.cableLength} м (сечение ${voltageDrop.section} мм², ${materialLabel}): ` +
       `${voltageDrop.drop.toFixed(2)} В (${voltageDrop.dropPercent.toFixed(2)}%) — ` +
       `${withinLimit ? 'в пределах общепринятой нормы (≤5%)' : 'превышает общепринятую норму (≤5%), увеличьте сечение'}.`;
-    netResVoltageDrop.classList.toggle('warn', !withinLimit);
+    nodeResVoltageDrop.classList.toggle('warn', !withinLimit);
   }
 
-  netResSelectivity.textContent =
-    `Сумма номиналов автоматов отходящих линий — ${sumOfBlockBreakers} А; вводной автомат подобран по суммарной ` +
-    `нагрузке с учётом коэффициента одновременности (Кс = ${main.simultaneityFactor}). Если его номинал меньше ` +
-    'этой суммы — это нормально при условии, что не все группы работают одновременно на полную мощность; ' +
-    'проверку селективности срабатывания защит выполняйте по таблицам производителя аппаратов или с привлечением специалиста.';
+  nodeResSelectivity.textContent = node.children.length
+    ? `Сумма номиналов автоматов дочерних линий — ${sumOfChildBreakers} А; автомат этого узла подобран по суммарной ` +
+      `нагрузке с учётом Кс = ${node.simultaneityFactor}. Если его номинал меньше этой суммы — это нормально при ` +
+      'условии, что не все дочерние линии работают одновременно на полную мощность; проверку селективности ' +
+      'срабатывания защит выполняйте по таблицам производителя аппаратов или с привлечением специалиста.'
+    : '';
 }
 
-addBlockBtn.addEventListener('click', () => {
-  addBlockElement();
+function renderPanel() {
+  const node = findNode(networkTree, selectedNodeId);
+  if (!node) {
+    networkPanel.hidden = true;
+    return;
+  }
+  networkPanel.hidden = false;
+  netPanelTitle.textContent = node.name;
+  nodeNameInput.value = node.name;
+  nodeHasOwnLoadInput.checked = node.hasOwnLoad;
+  nodeNetworkTypeSelect.value = node.networkType;
+  nodeVoltageInput.value = node.voltage;
+  nodePfInput.value = node.powerFactor;
+  document.getElementById(node.known === 'power' ? 'node-known-power' : 'node-known-current').checked = true;
+  if (node.known === 'power') {
+    nodePowerUnitSelect.value = '1';
+    nodePowerValueInput.value = node.knownValue || '';
+  } else {
+    nodeCurrentValueInput.value = node.knownValue || '';
+  }
+  nodeInstallationSelect.value = node.installationMethod;
+  nodeCableCountInput.value = node.cableCount;
+  nodeCableLengthInput.value = node.cableLength || '';
+  nodeKcInput.value = node.simultaneityFactor;
+
+  const isRoot = node.id === networkTree.id;
+  nodeCableLegend.textContent = isRoot ? 'Вводной кабель' : 'Кабель от родительского узла';
+  deleteNodeBtn.hidden = isRoot;
+  nodeKcField.hidden = node.children.length === 0;
+
+  updateNodeLoadFieldsUI();
+  updateNodeKnownFieldsUI();
+  renderNodeResult(node);
+}
+
+function selectNode(id) {
+  selectedNodeId = id;
+  renderTree();
+  renderPanel();
+}
+
+function onPanelChange() {
+  const node = findNode(networkTree, selectedNodeId);
+  if (!node) return;
+  node.name = nodeNameInput.value || 'Узел';
+  node.hasOwnLoad = nodeHasOwnLoadInput.checked;
+  node.networkType = nodeNetworkTypeSelect.value;
+  node.voltage = Number(nodeVoltageInput.value);
+  node.powerFactor = Number(nodePfInput.value);
+  node.known = document.querySelector('input[name="node-known"]:checked').value;
+  node.knownValue = node.known === 'power'
+    ? Number(nodePowerValueInput.value) * Number(nodePowerUnitSelect.value)
+    : Number(nodeCurrentValueInput.value);
+  node.installationMethod = nodeInstallationSelect.value;
+  node.cableCount = Number(nodeCableCountInput.value) || 1;
+  node.cableLength = Number(nodeCableLengthInput.value) || 0;
+  node.simultaneityFactor = Number(nodeKcInput.value) || 1;
+
+  netPanelTitle.textContent = node.name;
+  updateNodeLoadFieldsUI();
+  updateNodeKnownFieldsUI();
   persistNetworkScheme();
+  renderTree();
+}
+
+[
+  nodeNameInput, nodeHasOwnLoadInput, nodeNetworkTypeSelect, nodeVoltageInput, nodePfInput,
+  nodePowerValueInput, nodePowerUnitSelect, nodeCurrentValueInput, nodeInstallationSelect,
+  nodeCableCountInput, nodeCableLengthInput, nodeKcInput,
+  ...document.querySelectorAll('input[name="node-known"]'),
+].forEach((el) => {
+  el.addEventListener('input', onPanelChange);
+  el.addEventListener('change', onPanelChange);
 });
 
-networkBlocksContainer.addEventListener('input', persistNetworkScheme);
-networkBlocksContainer.addEventListener('change', persistNetworkScheme);
-[netMainNetworkType, netMainVoltage, netMainInstallation, netMainCableCount, netMainCableLength, netMainSimultaneity].forEach((el) => {
-  el.addEventListener('input', persistNetworkScheme);
-  el.addEventListener('change', persistNetworkScheme);
+addChildBtn.addEventListener('click', () => {
+  const parent = findNode(networkTree, selectedNodeId);
+  if (!parent) return;
+  const child = createNode();
+  parent.children.push(child);
+  selectedNodeId = child.id;
+  persistNetworkScheme();
+  renderTree();
+  renderPanel();
+});
+
+deleteNodeBtn.addEventListener('click', () => {
+  if (selectedNodeId === networkTree.id) return;
+  const node = findNode(networkTree, selectedNodeId);
+  const parent = findParentNode(networkTree, selectedNodeId);
+  if (!node || !parent) return;
+  const descendants = countDescendants(node);
+  if (descendants > 0) {
+    const word = pluralize(descendants, 'дочерний узел', 'дочерних узла', 'дочерних узлов');
+    if (!confirm(`Удалить узел «${node.name}» и ${descendants} ${word}?`)) return;
+  }
+  parent.children = parent.children.filter((child) => child.id !== node.id);
+  selectedNodeId = parent.id;
+  persistNetworkScheme();
+  renderTree();
+  renderPanel();
 });
 
 calcNetworkBtn.addEventListener('click', () => {
-  networkErrorMessage.textContent = '';
-  persistNetworkScheme();
-
-  const blockElements = Array.from(networkBlocksContainer.querySelectorAll('.network-block'));
-  if (!blockElements.length) {
-    networkErrorMessage.textContent = 'Добавьте хотя бы один блок потребителя.';
-    networkResults.hidden = true;
-    return;
-  }
-
-  const validBlocks = [];
-  blockElements.forEach((el) => {
-    const errorEl = el.querySelector('.block-error');
-    const resultEl = el.querySelector('.block-result');
-    errorEl.textContent = '';
-    resultEl.textContent = '';
-    resultEl.classList.remove('warn');
-    try {
-      const config = readBlockConfig(el);
-      const block = calculateBlock(config);
-      renderBlockResult(resultEl, block);
-      validBlocks.push(block);
-    } catch (err) {
-      errorEl.textContent = err.message;
-    }
-  });
-
-  if (!validBlocks.length) {
-    networkErrorMessage.textContent = 'Нет ни одного корректно заполненного блока — исправьте ошибки в блоках выше.';
-    networkResults.hidden = true;
-    return;
-  }
-
-  const main = readMainConfig();
-  try {
-    const incoming = aggregateIncoming({ blocks: validBlocks, ...main });
-    renderIncomingResult(incoming, main);
-    networkResults.hidden = false;
-  } catch (err) {
-    networkErrorMessage.textContent = err.message;
-    networkResults.hidden = true;
-  }
+  if (!networkTree) return;
+  const resultTree = calculateTree(networkTree);
+  lastCalcMap = flattenCalc(resultTree);
+  const errors = collectErrors(resultTree);
+  networkErrorMessage.textContent = errors.length ? `Не удалось рассчитать: ${errors.join('; ')}.` : '';
+  renderTree();
+  renderPanel();
 });
 
 const savedNetworkScheme = loadNetworkScheme();
-if (savedNetworkScheme) {
-  applyMainConfig(savedNetworkScheme.main ?? {});
-  savedNetworkScheme.blocks.forEach((block) => addBlockElement(block));
-} else {
-  addBlockElement({
-    name: 'Освещение',
-    networkType: NETWORK_TYPES.AC1,
-    voltage: 220,
-    powerFactor: 1,
-    known: 'power',
-    knownValue: 1000,
-    installationMethod: 'air',
-    cableCount: 1,
-    cableLength: 0,
-  });
-}
+networkTree = savedNetworkScheme ? savedNetworkScheme.tree : buildDefaultTree();
+selectedNodeId = networkTree.id;
+if (!savedNetworkScheme) persistNetworkScheme();
+renderTree();
+renderPanel();
 
 function showError(message) {
   errorMessage.textContent = message;
