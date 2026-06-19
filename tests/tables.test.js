@@ -42,3 +42,21 @@ test('recommendProtection при токе вне диапазона возвра
   assert.equal(result.copperCable, null);
   assert.equal(result.aluminumCable, null);
 });
+
+test('recommendProtection без опций использует прокладку в воздухе без поправки', () => {
+  const result = recommendProtection(14.2);
+  assert.equal(result.correction, 1);
+});
+
+test('recommendProtection учитывает поправочный коэффициент способа прокладки и числа кабелей', () => {
+  const result = recommendProtection(30, { installationMethod: 'conduit', cableCount: 4 });
+  assert.equal(result.breaker, 32);
+  assert.ok(Math.abs(result.correction - 0.68) < 1e-9);
+  assert.equal(result.copperCable.section, 10);
+  assert.equal(result.copperCable.ratedCurrent, 70);
+});
+
+test('recommendProtection с неизвестным способом прокладки не применяет поправку', () => {
+  const result = recommendProtection(14.2, { installationMethod: 'unknown' });
+  assert.equal(result.correction, 1);
+});

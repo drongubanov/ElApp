@@ -137,6 +137,19 @@ input:focus {
   border-color: var(--color-accent);
 }
 
+.field-group {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px 14px 4px;
+  margin-bottom: 18px;
+}
+
+.field-group legend {
+  padding: 0 6px;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
 .radio-group {
   display: flex;
   gap: 20px;
@@ -237,6 +250,57 @@ input:focus {
   color: var(--color-text-muted);
   font-size: 0.8rem;
   margin-bottom: 0;
+}
+
+.note-line {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin: 6px 0;
+}
+
+.note-line.warn {
+  color: var(--color-danger);
+}
+
+.note-line:empty {
+  display: none;
+}
+
+.btn-link {
+  width: 100%;
+  margin-top: 10px;
+  font-size: 0.9rem;
+}
+
+.ref-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 0.9rem;
+}
+
+.ref-table th,
+.ref-table td {
+  border: 1px solid var(--color-border);
+  padding: 6px 10px;
+  text-align: right;
+}
+
+.ref-table th:first-child,
+.ref-table td:first-child {
+  text-align: left;
+}
+
+.ref-table thead th {
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.ref-table tbody tr.highlight {
+  background: var(--color-accent-dark);
+  color: #fff;
+  font-weight: 600;
 }
 
 .history-header {

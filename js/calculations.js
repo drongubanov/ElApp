@@ -55,3 +55,46 @@ export function calculate({ networkType, voltage, powerFactor = 1, known, knownV
 
   return { networkType, voltage, powerFactor: pf, P, I, S, Q };
 }
+
+// Удельное сопротивление жилы при +20°C, Ом·мм²/м.
+export const RESISTIVITY = {
+  copper: 0.0175,
+  aluminum: 0.028,
+};
+
+/**
+ * Потеря напряжения в кабельной линии (упрощённо, без учёта индуктивного
+ * сопротивления — для протяжённых линий малого сечения это даёт
+ * приемлемую точность для предварительной оценки).
+ *
+ * DC и однофазная сеть: ΔU = 2·ρ·L·I·cosφ/S (прямой и обратный провод)
+ * Трёхфазная сеть:      ΔU = √3·ρ·L·I·cosφ/S (линейный провод)
+ */
+export function calculateVoltageDrop({ networkType, voltage, current, length, section, material, powerFactor = 1 }) {
+  if (!Object.values(NETWORK_TYPES).includes(networkType)) {
+    throw new Error('Неизвестный тип сети');
+  }
+  if (!(voltage > 0)) {
+    throw new Error('Напряжение должно быть больше нуля');
+  }
+  if (!(current > 0)) {
+    throw new Error('Ток должен быть больше нуля');
+  }
+  if (!(length > 0)) {
+    throw new Error('Длина линии должна быть больше нуля');
+  }
+  if (!(section > 0)) {
+    throw new Error('Сечение кабеля должно быть больше нуля');
+  }
+  const resistivity = RESISTIVITY[material];
+  if (!resistivity) {
+    throw new Error('Неизвестный материал жилы');
+  }
+
+  const pf = networkType === NETWORK_TYPES.DC ? 1 : powerFactor;
+  const k = networkType === NETWORK_TYPES.AC3 ? Math.sqrt(3) : 2;
+  const drop = (k * resistivity * length * current * pf) / section;
+  const dropPercent = (drop / voltage) * 100;
+
+  return { drop, dropPercent, material, length, section };
+}
