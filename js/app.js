@@ -116,11 +116,17 @@ function switchTab(tabName) {
   tabPanels.forEach((panel) => {
     panel.classList.toggle('active', panel.id === `tab-${tabName}`);
   });
+  if (tabName === 'network') {
+    // Дерево было скрыто — пересчитываем координаты bezier-линий после показа.
+    requestAnimationFrame(() => drawConnectors());
+  }
 }
 
 tabButtons.forEach((btn) => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
+
+window.addEventListener('resize', () => drawConnectors());
 
 function updateNetworkTypeUI() {
   const type = networkTypeSelect.value;
@@ -416,6 +422,57 @@ function renderTree() {
   networkTreeEl.innerHTML = '';
   if (!networkTree) return;
   networkTreeEl.appendChild(renderNodeEl(networkTree));
+  drawConnectors();
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/**
+ * Рисует кабельные линии между блоками в виде плавных bezier-кривых на
+ * SVG-слое поверх дерева. Координаты считаются относительно `.net-tree`,
+ * поэтому слой корректно совмещается с узлами при любой ширине и скролле.
+ * Если дерево скрыто (вкладка неактивна), getBoundingClientRect даёт нули —
+ * в этом случае перерисовка откладывается до показа вкладки.
+ */
+function drawConnectors() {
+  const tree = networkTreeEl;
+  let svg = tree.querySelector(':scope > .net-connectors');
+  if (!svg) {
+    svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('class', 'net-connectors');
+    tree.insertBefore(svg, tree.firstChild);
+  }
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+  const treeRect = tree.getBoundingClientRect();
+  if (treeRect.width === 0 || treeRect.height === 0) return;
+
+  const w = Math.ceil(treeRect.width);
+  const h = Math.ceil(treeRect.height);
+  svg.setAttribute('width', String(w));
+  svg.setAttribute('height', String(h));
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+
+  tree.querySelectorAll('.net-node-wrap.has-children').forEach((wrap) => {
+    const li = wrap.parentElement;
+    const childUl = li.querySelector(':scope > ul');
+    if (!childUl) return;
+
+    const pr = wrap.getBoundingClientRect();
+    const px = pr.left - treeRect.left + pr.width / 2;
+    const py = pr.top - treeRect.top + pr.height;
+
+    childUl.querySelectorAll(':scope > li > .net-node-wrap').forEach((childWrap) => {
+      const cr = childWrap.getBoundingClientRect();
+      const cx = cr.left - treeRect.left + cr.width / 2;
+      const cy = cr.top - treeRect.top;
+      const midY = (py + cy) / 2;
+      const path = document.createElementNS(SVG_NS, 'path');
+      path.setAttribute('class', 'net-connector');
+      path.setAttribute('d', `M ${px} ${py} C ${px} ${midY}, ${cx} ${midY}, ${cx} ${cy}`);
+      svg.appendChild(path);
+    });
+  });
 }
 
 function updateNodeLoadFieldsUI() {
