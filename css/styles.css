@@ -400,7 +400,10 @@ input:focus {
   font-size: 0.85rem;
 }
 
-#calc-network-btn {
+.net-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-bottom: 10px;
 }
 
@@ -439,6 +442,33 @@ input:focus {
   fill: none;
   stroke: var(--color-border);
   stroke-width: 1.5;
+  transition: stroke 0.25s ease, stroke-width 0.25s ease, opacity 0.25s ease, filter 0.25s ease;
+}
+
+/* При наведении на узел подсвечивается путь к корню (узлы + линии),
+   остальное затухает — чтобы было видно цепочку питания. */
+.net-tree.is-hovering .net-node-wrap {
+  opacity: 0.3;
+}
+
+.net-tree.is-hovering .net-node-wrap.on-hover-path {
+  opacity: 1;
+}
+
+.net-tree.is-hovering .net-node-wrap.on-hover-path .net-node {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent), 0 0 12px rgba(245, 158, 11, 0.35);
+}
+
+.net-tree.is-hovering .net-connector {
+  opacity: 0.2;
+}
+
+.net-tree.is-hovering .net-connector.on-hover-path {
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+  opacity: 1;
+  filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.6));
 }
 
 .net-tree ul {
@@ -457,6 +487,7 @@ input:focus {
 .net-node-wrap {
   position: relative;
   z-index: 1;
+  transition: opacity 0.25s ease;
 }
 
 .net-node {

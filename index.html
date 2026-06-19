@@ -151,7 +151,12 @@
         Кнопка «Рассчитать сеть» подбирает автоматы и кабели для всех линий дерева.
       </p>
 
-      <button type="button" id="calc-network-btn" class="btn-primary">Рассчитать сеть</button>
+      <div class="net-actions">
+        <button type="button" id="calc-network-btn" class="btn-primary">Рассчитать сеть</button>
+        <button type="button" id="reset-network-btn" class="btn-secondary" title="Удалить все узлы и параметры и начать сначала">
+          ⟲ Сбросить сеть
+        </button>
+      </div>
       <p class="error-message" id="network-error-message" role="alert"></p>
 
       <div class="net-tree-wrapper">
