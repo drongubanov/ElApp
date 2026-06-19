@@ -369,6 +369,81 @@ input:focus {
   margin-top: 20px;
 }
 
+.note {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+#network-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.network-block {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.network-block-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.block-name {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 4px 2px;
+}
+
+.block-name:focus {
+  outline: none;
+  border-bottom-color: var(--color-accent);
+}
+
+.remove-block-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.remove-block-btn:hover {
+  color: var(--color-danger);
+}
+
+.block-result:empty {
+  display: none;
+}
+
+.network-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.network-actions .btn-secondary {
+  flex: 1;
+}
+
+.network-actions .btn-primary {
+  flex: 1;
+  width: auto;
+}
+
 .formula-block {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
