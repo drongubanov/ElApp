@@ -225,6 +225,17 @@ input:focus {
   color: var(--color-danger);
 }
 
+.btn-secondary.is-active {
+  background: var(--color-accent-dark);
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.btn-secondary.is-active:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
 .error-message {
   color: var(--color-danger);
   min-height: 1.2em;
