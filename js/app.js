@@ -116,6 +116,7 @@ const clearHistoryBtn = document.getElementById('clear-history-btn');
 const networkTreeEl = document.getElementById('network-tree');
 const calcNetworkBtn = document.getElementById('calc-network-btn');
 const undoNetworkBtn = document.getElementById('undo-network-btn');
+const heatmapToggleBtn = document.getElementById('heatmap-toggle-btn');
 const exportMenuBtn = document.getElementById('export-menu-btn');
 const exportDropdown = document.getElementById('export-dropdown');
 const exportPdfBtn = document.getElementById('export-pdf-btn');
@@ -338,6 +339,7 @@ let searchMatchIds = new Set();
 let searchPathIds = new Set();
 let addMenuParentId = null;
 let addMenuAnchor = null;
+let heatMapEnabled = false;
 
 const UNDO_LIMIT = 20;
 let undoStack = [];
@@ -1054,6 +1056,7 @@ function renderTree() {
   networkTreeEl.appendChild(renderNodeEl(networkTree));
   drawConnectors();
   renderMultiActions();
+  renderHeatMap();
 }
 
 /** Панель групповых операций — видна, когда выбрано более одного узла. */
@@ -1349,6 +1352,45 @@ function clearHoverPath() {
   networkTreeEl.classList.remove('is-hovering');
   networkTreeEl.querySelectorAll('.on-hover-path').forEach((el) => el.classList.remove('on-hover-path'));
   clearHoverInlineStyles();
+  renderHeatMap();
+}
+
+/**
+ * Постоянный режим тепловой карты: красит все узлы и линии дерева по их
+ * расчётному току сразу после расчёта, без необходимости наводить курсор
+ * на каждый узел по отдельности. Включается кнопкой «Тепловая карта» в
+ * тулбаре; при наведении на узел временно перехватывается hover-подсветкой
+ * (highlightHoverPath/clearHoverPath), которая по выходу курсора вызывает
+ * эту функцию снова, чтобы вернуть постоянную раскраску.
+ */
+function renderHeatMap() {
+  if (!heatMapEnabled) return;
+  const range = currentRange();
+  if (!range) return;
+
+  networkTreeEl.querySelectorAll('.net-node-wrap').forEach((wrap) => {
+    const card = wrap.querySelector('.net-node');
+    const color = nodeLoadColor(wrap.dataset.id, range);
+    if (card && color) {
+      card.style.borderColor = color.solid;
+      card.style.boxShadow = `0 0 0 1px ${color.solid}, 0 0 8px 2px rgba(${color.r}, ${color.g}, ${color.b}, 0.35)`;
+    }
+  });
+
+  networkTreeEl.querySelectorAll('.net-connector').forEach((path) => {
+    const color = nodeLoadColor(path.dataset.child, range);
+    if (color) path.style.stroke = color.solid;
+  });
+
+  networkTreeEl.querySelectorAll('.net-connector-current').forEach((group) => {
+    const color = nodeLoadColor(group.dataset.child, range);
+    if (color) {
+      const circle = group.querySelector('circle');
+      const text = group.querySelector('text');
+      if (circle) circle.style.stroke = color.solid;
+      if (text) text.style.fill = color.solid;
+    }
+  });
 }
 
 function updateNodeLoadFieldsUI() {
@@ -1631,6 +1673,14 @@ function performUndo() {
 }
 
 undoNetworkBtn.addEventListener('click', performUndo);
+
+heatmapToggleBtn.addEventListener('click', () => {
+  heatMapEnabled = !heatMapEnabled;
+  heatmapToggleBtn.setAttribute('aria-pressed', String(heatMapEnabled));
+  heatmapToggleBtn.classList.toggle('is-active', heatMapEnabled);
+  if (heatMapEnabled) renderHeatMap();
+  else clearHoverInlineStyles();
+});
 
 multiDuplicateBtn.addEventListener('click', duplicateSelected);
 multiDeleteBtn.addEventListener('click', deleteSelected);
