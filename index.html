@@ -192,9 +192,10 @@
         ▾/▸ — свернуть/развернуть ветвь, + — добавить дочерний узел (пустой или по шаблону:
         розеточная группа, освещение, электродвигатель), − — удалить узел. Узел (кроме
         корневого) можно перетащить на другой узел, чтобы перенести его вместе с поддеревом в новое
-        место схемы. Горячие клавиши на выбранном узле: Delete — удалить, Ctrl+D — дублировать,
-        Ctrl+Z — отменить последнее действие. Кнопка «Рассчитать сеть» подбирает автоматы и кабели
-        для всех линий дерева.
+        место схемы. Ctrl+клик по узлам выделяет несколько узлов сразу — для групповых операций
+        (дублировать, удалить, перетащить вместе). Горячие клавиши на выбранном узле: Delete — удалить,
+        Ctrl+D — дублировать, Ctrl+Z — отменить последнее действие. Кнопка «Рассчитать сеть» подбирает
+        автоматы и кабели для всех линий дерева.
       </p>
 
       <fieldset class="field-group net-projects">
@@ -305,6 +306,13 @@
         <input type="search" id="network-search" class="net-search-input"
           placeholder="Поиск узла по названию…" aria-label="Поиск узла по названию" autocomplete="off" />
         <span id="network-search-status" class="note-line" role="status" aria-live="polite"></span>
+      </div>
+
+      <div class="net-multi-actions" id="net-multi-actions" hidden>
+        <span class="net-multi-count" id="net-multi-count"></span>
+        <button type="button" id="multi-duplicate-btn" class="btn-secondary">⧉ Дублировать выбранные</button>
+        <button type="button" id="multi-delete-btn" class="btn-secondary">− Удалить выбранные</button>
+        <button type="button" id="multi-clear-btn" class="btn-secondary">Снять выделение</button>
       </div>
 
       <div class="net-tree-wrapper">
