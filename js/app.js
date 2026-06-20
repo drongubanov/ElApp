@@ -147,6 +147,9 @@ const netWarningsList = document.getElementById('net-warnings-list');
 const networkSearchInput = document.getElementById('network-search');
 const networkSearchStatus = document.getElementById('network-search-status');
 const nodeAddMenu = document.getElementById('node-add-menu');
+const nodeContextMenu = document.getElementById('node-context-menu');
+const contextDuplicateBtn = document.getElementById('context-duplicate-btn');
+const contextDeleteBtn = document.getElementById('context-delete-btn');
 const netMultiActions = document.getElementById('net-multi-actions');
 const netMultiCount = document.getElementById('net-multi-count');
 const multiDuplicateBtn = document.getElementById('multi-duplicate-btn');
@@ -729,6 +732,67 @@ window.addEventListener('resize', () => {
   if (!nodeAddMenu.hidden) positionAddMenu();
 });
 
+// --- Контекстное меню карточки узла (редкие действия: дублировать, удалить) -
+// Правый клик или долгое нажатие на карточке открывает компактное меню у
+// точки клика — так с тулбара карточки убраны редко нужные ⧉/− и остаются
+// только частые действия: параметры (⚙), свернуть/развернуть (▾/▸), добавить (+).
+let contextMenuNodeId = null;
+let contextMenuPoint = null;
+
+function positionContextMenu(x, y) {
+  const menuRect = nodeContextMenu.getBoundingClientRect();
+  let left = x;
+  let top = y;
+  if (left + menuRect.width > window.innerWidth - 8) left = window.innerWidth - menuRect.width - 8;
+  if (top + menuRect.height > window.innerHeight - 8) top = window.innerHeight - menuRect.height - 8;
+  nodeContextMenu.style.left = `${Math.max(8, left)}px`;
+  nodeContextMenu.style.top = `${Math.max(8, top)}px`;
+}
+
+function openContextMenu(nodeId, x, y) {
+  contextMenuNodeId = nodeId;
+  contextMenuPoint = { x, y };
+  nodeContextMenu.hidden = false;
+  positionContextMenu(x, y);
+}
+
+function closeContextMenu() {
+  nodeContextMenu.hidden = true;
+  contextMenuNodeId = null;
+  contextMenuPoint = null;
+}
+
+contextDuplicateBtn.addEventListener('click', () => {
+  const id = contextMenuNodeId;
+  closeContextMenu();
+  if (id) duplicateNode(id);
+});
+
+contextDeleteBtn.addEventListener('click', () => {
+  const id = contextMenuNodeId;
+  closeContextMenu();
+  if (id) deleteNode(id);
+});
+
+document.addEventListener('click', (event) => {
+  if (!nodeContextMenu.hidden && !event.target.closest('#node-context-menu')) closeContextMenu();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !nodeContextMenu.hidden) closeContextMenu();
+});
+
+// Меню — position: fixed и привязано к точке клика, а не к карточке, поэтому
+// при скролле/ресайзе его не закрываем (как и меню добавления), а просто
+// пересчитываем позицию у той же точки — иначе случайный скролл, вызванный
+// тем же действием, что открыло меню, закрывал бы его сразу после открытия.
+window.addEventListener('scroll', () => {
+  if (!nodeContextMenu.hidden && contextMenuPoint) positionContextMenu(contextMenuPoint.x, contextMenuPoint.y);
+}, true);
+window.addEventListener('resize', () => {
+  if (!nodeContextMenu.hidden && contextMenuPoint) positionContextMenu(contextMenuPoint.x, contextMenuPoint.y);
+});
+
 function deleteNode(id) {
   if (id === networkTree.id) return;
   const node = findNode(networkTree, id);
@@ -912,6 +976,24 @@ function renderNodeEl(node) {
       draggedNodeId = null;
       card.classList.remove('dragging');
     });
+
+    card.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openContextMenu(node.id, event.clientX, event.clientY);
+    });
+
+    let longPressTimer = null;
+    card.addEventListener('touchstart', (event) => {
+      if (event.touches.length !== 1) return;
+      const { clientX, clientY } = event.touches[0];
+      longPressTimer = setTimeout(() => {
+        longPressTimer = null;
+        openContextMenu(node.id, clientX, clientY);
+      }, 550);
+    });
+    card.addEventListener('touchend', () => clearTimeout(longPressTimer));
+    card.addEventListener('touchmove', () => clearTimeout(longPressTimer));
   }
 
   card.addEventListener('dragover', (event) => {
@@ -956,20 +1038,6 @@ function renderNodeEl(node) {
   });
   toolbar.appendChild(paramsBtn);
 
-  if (!isRoot) {
-    const duplicateBtn = document.createElement('button');
-    duplicateBtn.type = 'button';
-    duplicateBtn.className = 'net-node-icon-btn net-node-duplicate-btn';
-    duplicateBtn.title = 'Дублировать узел вместе с поддеревом';
-    duplicateBtn.setAttribute('aria-label', 'Дублировать узел вместе с поддеревом');
-    duplicateBtn.textContent = '⧉';
-    duplicateBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      duplicateNode(node.id);
-    });
-    toolbar.appendChild(duplicateBtn);
-  }
-
   if (node.children.length) {
     const toggleBtn = document.createElement('button');
     toggleBtn.type = 'button';
@@ -999,20 +1067,6 @@ function renderNodeEl(node) {
     openAddMenu(node.id, addBtn);
   });
   toolbar.appendChild(addBtn);
-
-  if (!isRoot) {
-    const deleteBtn = document.createElement('button');
-    deleteBtn.type = 'button';
-    deleteBtn.className = 'net-node-icon-btn net-node-delete-btn';
-    deleteBtn.title = 'Удалить узел';
-    deleteBtn.setAttribute('aria-label', 'Удалить узел');
-    deleteBtn.textContent = '−';
-    deleteBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      deleteNode(node.id);
-    });
-    toolbar.appendChild(deleteBtn);
-  }
 
   header.append(toolbar);
 

@@ -762,6 +762,11 @@ input:focus {
   color: var(--color-accent);
 }
 
+.net-add-menu > .net-context-menu-danger:hover .net-add-menu-label,
+.net-add-menu > .net-context-menu-danger:focus-visible .net-add-menu-label {
+  color: var(--color-danger);
+}
+
 .net-add-menu-label {
   font-weight: 600;
 }
@@ -1028,11 +1033,6 @@ input:focus {
 .net-node-icon-btn.net-node-add-btn:hover {
   border-color: var(--color-success);
   color: var(--color-success);
-}
-
-.net-node-icon-btn.net-node-delete-btn:hover {
-  border-color: var(--color-danger);
-  color: var(--color-danger);
 }
 
 .net-node-name {
