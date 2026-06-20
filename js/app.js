@@ -16,10 +16,9 @@ import { buildSheet } from './schemeSheet.js';
 import { buildSchemePdf } from './exportPdf.js';
 import { buildDxf } from './exportDxf.js';
 import { buildSpecCsv } from './schemeSpec.js';
+import { collectSchemeWarnings, VOLTAGE_DROP_LIMIT_PERCENT } from './schemeWarnings.js';
 import { loadHistory, saveHistoryEntry, deleteHistoryEntry, clearHistory } from './history.js';
 import { formatPower, formatApparentPower, formatReactivePower, formatCurrent, formatDateTime } from './format.js';
-
-const VOLTAGE_DROP_LIMIT_PERCENT = 5;
 
 const NETWORK_LABELS = {
   [NETWORK_TYPES.DC]: 'Постоянный ток',
@@ -127,6 +126,9 @@ const importProjectBtn = document.getElementById('import-project-btn');
 const importProjectInput = document.getElementById('import-project-input');
 const networkProjectStatus = document.getElementById('network-project-status');
 const networkErrorMessage = document.getElementById('network-error-message');
+const networkWarnings = document.getElementById('network-warnings');
+const netWarningsCount = document.getElementById('net-warnings-count');
+const netWarningsList = document.getElementById('net-warnings-list');
 const networkPanel = document.getElementById('network-panel');
 const netPanelTitle = document.getElementById('net-panel-title');
 
@@ -305,6 +307,7 @@ function buildDefaultTree() {
 let networkTree = null;
 let selectedNodeId = null;
 let lastCalcMap = null;
+let lastResultTree = null;
 let activeProjectId = null;
 let draggedNodeId = null;
 
@@ -367,6 +370,31 @@ function collectDescendantIds(node, ids = new Set()) {
   ids.add(node.id);
   node.children.forEach((child) => collectDescendantIds(child, ids));
   return ids;
+}
+
+/** Разворачивает все свёрнутые ветви на пути от корня к узлу, чтобы он стал виден в дереве. Возвращает true, если что-то изменилось. */
+function expandAncestors(nodeId) {
+  let changed = false;
+  let parent = findParentNode(networkTree, nodeId);
+  while (parent) {
+    if (parent.collapsed) {
+      parent.collapsed = false;
+      changed = true;
+    }
+    parent = findParentNode(networkTree, parent.id);
+  }
+  return changed;
+}
+
+/** Выбирает узел и прокручивает его карточку в зону видимости, разворачивая свёрнутые ветви на пути к нему. */
+function revealNode(nodeId) {
+  if (expandAncestors(nodeId)) persistNetworkScheme();
+  selectNode(nodeId);
+  requestAnimationFrame(() => {
+    networkTreeEl
+      .querySelector(`.net-node-wrap[data-id="${nodeId}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+  });
 }
 
 function persistNetworkScheme() {
@@ -691,6 +719,58 @@ function renderTree() {
   if (!networkTree) return;
   networkTreeEl.appendChild(renderNodeEl(networkTree));
   drawConnectors();
+}
+
+/**
+ * Сводная панель проверок: собирает все замечания дерева (ошибки, баланс,
+ * потеря напряжения, время отключения КЗ, селективность) в один кликабельный
+ * список. Показывается только после расчёта (lastResultTree); до него скрыта.
+ */
+function renderWarnings() {
+  if (!lastResultTree) {
+    networkWarnings.hidden = true;
+    return;
+  }
+  networkWarnings.hidden = false;
+  netWarningsList.innerHTML = '';
+
+  const warnings = collectSchemeWarnings(lastResultTree);
+  if (!warnings.length) {
+    netWarningsCount.textContent = '';
+    const li = document.createElement('li');
+    li.className = 'net-warning-item ok';
+    li.textContent = '✓ Все проверки пройдены: ошибок, перегрузок и превышений не обнаружено.';
+    netWarningsList.appendChild(li);
+    return;
+  }
+
+  netWarningsCount.textContent = `(${warnings.length})`;
+  warnings.forEach((warning) => {
+    const li = document.createElement('li');
+    li.className = `net-warning-item ${warning.severity}`;
+    li.setAttribute('role', 'button');
+    li.tabIndex = 0;
+
+    const icon = document.createElement('span');
+    icon.className = 'net-warning-icon';
+    icon.textContent = warning.severity === 'error' ? '✗' : '⚠';
+
+    const body = document.createElement('span');
+    body.className = 'net-warning-body';
+    const name = document.createElement('strong');
+    name.textContent = warning.nodeName;
+    body.append(name, document.createTextNode(` — ${warning.message}`));
+
+    li.append(icon, body);
+    li.addEventListener('click', () => revealNode(warning.nodeId));
+    li.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        revealNode(warning.nodeId);
+      }
+    });
+    netWarningsList.appendChild(li);
+  });
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -1155,11 +1235,13 @@ nodeNetworkTypeSelect.addEventListener('change', () => {
 calcNetworkBtn.addEventListener('click', () => {
   if (!networkTree) return;
   const resultTree = annotateShortCircuit(networkTree, calculateTree(networkTree));
+  lastResultTree = resultTree;
   lastCalcMap = flattenCalc(resultTree);
   const errors = collectErrors(resultTree);
   networkErrorMessage.textContent = errors.length ? `Не удалось рассчитать: ${errors.join('; ')}.` : '';
   renderTree();
   renderPanel();
+  renderWarnings();
 });
 
 undoNetworkBtn.addEventListener('click', () => {
@@ -1167,11 +1249,13 @@ undoNetworkBtn.addEventListener('click', () => {
   networkTree = undoStack.pop();
   if (!findNode(networkTree, selectedNodeId)) selectedNodeId = networkTree.id;
   lastCalcMap = null;
+  lastResultTree = null;
   networkErrorMessage.textContent = '';
   updateUndoButtonUI();
   persistNetworkScheme();
   renderTree();
   renderPanel();
+  renderWarnings();
   renderProjectList();
 });
 
@@ -1296,10 +1380,12 @@ importProjectInput.addEventListener('change', () => {
     selectedNodeId = networkTree.id;
     activeProjectId = null; // загруженный из файла проект не привязан к сохранённому
     lastCalcMap = null;
+    lastResultTree = null;
     networkErrorMessage.textContent = '';
     persistNetworkScheme();
     renderTree();
     renderPanel();
+    renderWarnings();
     renderProjectList();
   };
   reader.onerror = () => {
@@ -1315,10 +1401,12 @@ resetNetworkBtn.addEventListener('click', () => {
   selectedNodeId = networkTree.id;
   activeProjectId = null;
   lastCalcMap = null;
+  lastResultTree = null;
   networkErrorMessage.textContent = '';
   persistNetworkScheme();
   renderTree();
   renderPanel();
+  renderWarnings();
   renderProjectList();
 });
 
@@ -1333,10 +1421,12 @@ openProjectBtn.addEventListener('click', () => {
   selectedNodeId = networkTree.id;
   activeProjectId = project.id;
   lastCalcMap = null;
+  lastResultTree = null;
   networkErrorMessage.textContent = '';
   persistNetworkScheme();
   renderTree();
   renderPanel();
+  renderWarnings();
   renderProjectList();
 });
 
