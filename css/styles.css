@@ -404,8 +404,20 @@ input:focus {
 .net-actions {
   display: flex;
   flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
   gap: 10px;
   margin-bottom: 10px;
+}
+
+.net-actions-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.net-actions-group .btn-primary {
+  width: auto;
 }
 
 /* Только поле с деревом узлов выходит за ограничение ширины main (1280px)
