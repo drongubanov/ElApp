@@ -754,6 +754,67 @@ input:focus {
   font-size: 0.85rem;
 }
 
+.formula-block dl {
+  margin: 8px 0;
+}
+
+.formula-block dt {
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.formula-block dd {
+  margin: 0 0 0 14px;
+  color: var(--color-text-muted);
+}
+
+.ref-toc {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px 16px 14px 32px;
+  margin-bottom: 20px;
+}
+
+.ref-toc strong {
+  display: block;
+  margin-bottom: 8px;
+  margin-left: -16px;
+}
+
+.ref-toc ol {
+  margin: 0;
+  padding-left: 0;
+}
+
+.ref-toc a {
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.ref-toc a:hover {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+.ref-chapter {
+  margin-top: 32px;
+  margin-bottom: 12px;
+  padding-top: 16px;
+  border-top: 2px solid var(--color-border);
+  scroll-margin-top: 16px;
+}
+
+.ref-chapter:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.ref-table-wrapper {
+  overflow-x: auto;
+}
+
 .app-footer {
   text-align: center;
   color: var(--color-text-muted);
