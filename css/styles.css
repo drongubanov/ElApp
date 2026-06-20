@@ -618,6 +618,19 @@ input:focus {
   border-color: var(--color-danger);
 }
 
+.net-node[draggable='true'] {
+  cursor: grab;
+}
+
+.net-node.dragging {
+  opacity: 0.4;
+}
+
+.net-node.drag-over {
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 2px var(--color-success);
+}
+
 .net-node-header {
   display: flex;
   align-items: center;

@@ -8,13 +8,14 @@ import {
   SELECTIVITY_SAFE_RATIO,
 } from './tables.js';
 import { calculateShortCircuit, checkDisconnectionByCurve } from './shortCircuit.js';
-import { calculateTree, DEFAULT_START_CURRENT_RATIO } from './network.js';
+import { calculateTree, annotateShortCircuit, DEFAULT_START_CURRENT_RATIO } from './network.js';
 import { loadNetworkScheme, saveNetworkScheme } from './networkStorage.js';
 import { loadProjects, getProject, saveProject, deleteProject } from './networkProjects.js';
 import { buildSchemeLayout } from './schemeLayout.js';
 import { buildSheet } from './schemeSheet.js';
 import { buildSchemePdf } from './exportPdf.js';
 import { buildDxf } from './exportDxf.js';
+import { buildSpecCsv } from './schemeSpec.js';
 import { loadHistory, saveHistoryEntry, deleteHistoryEntry, clearHistory } from './history.js';
 import { formatPower, formatApparentPower, formatReactivePower, formatCurrent, formatDateTime } from './format.js';
 
@@ -109,14 +110,19 @@ const clearHistoryBtn = document.getElementById('clear-history-btn');
 
 const networkTreeEl = document.getElementById('network-tree');
 const calcNetworkBtn = document.getElementById('calc-network-btn');
+const undoNetworkBtn = document.getElementById('undo-network-btn');
 const exportPdfBtn = document.getElementById('export-pdf-btn');
 const exportDxfBtn = document.getElementById('export-dxf-btn');
+const exportSpecBtn = document.getElementById('export-spec-btn');
 const resetNetworkBtn = document.getElementById('reset-network-btn');
 const networkProjectSelect = document.getElementById('network-project-select');
 const openProjectBtn = document.getElementById('open-project-btn');
 const saveProjectAsBtn = document.getElementById('save-project-as-btn');
 const saveProjectBtn = document.getElementById('save-project-btn');
 const deleteProjectBtn = document.getElementById('delete-project-btn');
+const exportProjectBtn = document.getElementById('export-project-btn');
+const importProjectBtn = document.getElementById('import-project-btn');
+const importProjectInput = document.getElementById('import-project-input');
 const networkProjectStatus = document.getElementById('network-project-status');
 const networkErrorMessage = document.getElementById('network-error-message');
 const networkPanel = document.getElementById('network-panel');
@@ -139,6 +145,9 @@ const nodeUtilizationInput = document.getElementById('node-utilization-factor');
 const nodeLoadTypeSelect = document.getElementById('node-load-type');
 const nodeStartRatioField = document.getElementById('node-start-ratio-field');
 const nodeStartRatioInput = document.getElementById('node-start-ratio');
+const nodeTransformerField = document.getElementById('node-transformer-field');
+const nodeTransformerPowerInput = document.getElementById('node-transformer-power');
+const nodeTransformerUkInput = document.getElementById('node-transformer-uk');
 const nodeCableLegend = document.getElementById('node-cable-legend');
 const nodeInstallationSelect = document.getElementById('node-installation');
 const nodeCableCountInput = document.getElementById('node-cable-count');
@@ -158,6 +167,8 @@ const nodeResCable = document.getElementById('node-res-cable');
 const nodeResPeSection = document.getElementById('node-res-pe-section');
 const nodeResVoltageDrop = document.getElementById('node-res-voltage-drop');
 const nodeResSelectivity = document.getElementById('node-res-selectivity');
+const nodeResBalance = document.getElementById('node-res-balance');
+const nodeResShortCircuit = document.getElementById('node-res-shortcircuit');
 
 function switchTab(tabName) {
   tabButtons.forEach((btn) => {
@@ -252,6 +263,9 @@ function createNode(overrides = {}) {
     utilizationFactor: 1,
     loadType: 'general',
     startCurrentRatio: DEFAULT_START_CURRENT_RATIO,
+    transformerPowerKva: null,
+    transformerUkPercent: null,
+    collapsed: false,
     children: [],
     ...overrides,
   };
@@ -290,6 +304,22 @@ let networkTree = null;
 let selectedNodeId = null;
 let lastCalcMap = null;
 let activeProjectId = null;
+let draggedNodeId = null;
+
+const UNDO_LIMIT = 20;
+let undoStack = [];
+
+/** Сохраняет снимок дерева в стек отмены — вызывается перед деструктивными операциями (удаление, перенос, замена). */
+function pushUndo() {
+  if (!networkTree) return;
+  undoStack.push(structuredClone(networkTree));
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  updateUndoButtonUI();
+}
+
+function updateUndoButtonUI() {
+  undoNetworkBtn.disabled = undoStack.length === 0;
+}
 
 function findNode(node, id) {
   if (node.id === id) return node;
@@ -383,7 +413,8 @@ function nodeTag(node) {
 function nodeMeta(node) {
   if (node.hasOwnLoad) return `${NETWORK_SHORT_LABELS[node.networkType] ?? ''} ${node.voltage} В`;
   if (node.children.length) {
-    return `${node.children.length} ${pluralize(node.children.length, 'дочерний узел', 'дочерних узла', 'дочерних узлов')}`;
+    const word = pluralize(node.children.length, 'дочерний узел', 'дочерних узла', 'дочерних узлов');
+    return node.collapsed ? `${node.children.length} ${word} (свёрнуто)` : `${node.children.length} ${word}`;
   }
   return '';
 }
@@ -423,10 +454,52 @@ function deleteNode(id) {
     const word = pluralize(descendants, 'дочерний узел', 'дочерних узла', 'дочерних узлов');
     if (!confirm(`Удалить узел «${node.name}» и ${descendants} ${word}?`)) return;
   }
+  pushUndo();
   parent.children = parent.children.filter((child) => child.id !== node.id);
   if (isDescendantOrSelf(node, selectedNodeId)) {
     selectedNodeId = parent.id;
   }
+  persistNetworkScheme();
+  renderTree();
+  renderPanel();
+}
+
+function cloneNodeDeepInner(node) {
+  return {
+    ...node,
+    id: crypto.randomUUID(),
+    children: node.children.map((child) => cloneNodeDeepInner(child)),
+  };
+}
+
+/** Дублирует узел вместе со всем поддеревом, вставляя копию следующим соседом сразу после оригинала. */
+function duplicateNode(id) {
+  if (id === networkTree.id) return;
+  const node = findNode(networkTree, id);
+  const parent = findParentNode(networkTree, id);
+  if (!node || !parent) return;
+  pushUndo();
+  const clone = cloneNodeDeepInner(node);
+  clone.name = `${node.name} (копия)`;
+  const index = parent.children.findIndex((child) => child.id === node.id);
+  parent.children.splice(index + 1, 0, clone);
+  selectedNodeId = clone.id;
+  persistNetworkScheme();
+  renderTree();
+  renderPanel();
+}
+
+/** Переносит узел (вместе с поддеревом) под другого родителя — основа drag-and-drop в дереве. */
+function moveNode(nodeId, newParentId) {
+  if (nodeId === newParentId || nodeId === networkTree.id) return;
+  const node = findNode(networkTree, nodeId);
+  const newParent = findNode(networkTree, newParentId);
+  const oldParent = findParentNode(networkTree, nodeId);
+  if (!node || !newParent || !oldParent || oldParent.id === newParent.id) return;
+  if (isDescendantOrSelf(node, newParentId)) return; // нельзя перенести узел в его же поддерево
+  pushUndo();
+  oldParent.children = oldParent.children.filter((child) => child.id !== node.id);
+  newParent.children.push(node);
   persistNetworkScheme();
   renderTree();
   renderPanel();
@@ -453,6 +526,34 @@ function renderNodeEl(node) {
   const calc = lastCalcMap?.get(node.id);
   if (calc?.error) card.classList.add('has-error');
 
+  if (!isRoot) {
+    card.draggable = true;
+    card.addEventListener('dragstart', (event) => {
+      draggedNodeId = node.id;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', node.id);
+      card.classList.add('dragging');
+    });
+    card.addEventListener('dragend', () => {
+      draggedNodeId = null;
+      card.classList.remove('dragging');
+    });
+  }
+
+  card.addEventListener('dragover', (event) => {
+    if (!draggedNodeId || draggedNodeId === node.id) return;
+    const draggedNode = findNode(networkTree, draggedNodeId);
+    if (!draggedNode || isDescendantOrSelf(draggedNode, node.id)) return;
+    event.preventDefault();
+    card.classList.add('drag-over');
+  });
+  card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+  card.addEventListener('drop', (event) => {
+    event.preventDefault();
+    card.classList.remove('drag-over');
+    if (draggedNodeId) moveNode(draggedNodeId, node.id);
+  });
+
   const header = document.createElement('div');
   header.className = 'net-node-header';
 
@@ -474,6 +575,37 @@ function renderNodeEl(node) {
     selectNode(node.id);
   });
   toolbar.appendChild(paramsBtn);
+
+  if (!isRoot) {
+    const duplicateBtn = document.createElement('button');
+    duplicateBtn.type = 'button';
+    duplicateBtn.className = 'net-node-icon-btn net-node-duplicate-btn';
+    duplicateBtn.title = 'Дублировать узел вместе с поддеревом';
+    duplicateBtn.setAttribute('aria-label', 'Дублировать узел вместе с поддеревом');
+    duplicateBtn.textContent = '⧉';
+    duplicateBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      duplicateNode(node.id);
+    });
+    toolbar.appendChild(duplicateBtn);
+  }
+
+  if (node.children.length) {
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'net-node-icon-btn net-node-toggle-btn';
+    const toggleLabel = node.collapsed ? 'Развернуть ветвь' : 'Свернуть ветвь';
+    toggleBtn.title = toggleLabel;
+    toggleBtn.setAttribute('aria-label', toggleLabel);
+    toggleBtn.textContent = node.collapsed ? '▸' : '▾';
+    toggleBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      node.collapsed = !node.collapsed;
+      persistNetworkScheme();
+      renderTree();
+    });
+    toolbar.appendChild(toggleBtn);
+  }
 
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
@@ -526,6 +658,13 @@ function renderNodeEl(node) {
     card.appendChild(badge);
   }
 
+  if (calc?.balance) {
+    const balanceBadge = document.createElement('span');
+    balanceBadge.className = 'net-node-badge warn';
+    balanceBadge.textContent = '⚠ баланс нагрузки';
+    card.appendChild(balanceBadge);
+  }
+
   card.addEventListener('click', () => selectNode(node.id));
   card.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -536,7 +675,7 @@ function renderNodeEl(node) {
   wrap.appendChild(card);
   li.appendChild(wrap);
 
-  if (node.children.length) {
+  if (node.children.length && !node.collapsed) {
     const ul = document.createElement('ul');
     node.children.forEach((child) => ul.appendChild(renderNodeEl(child)));
     li.appendChild(ul);
@@ -877,6 +1016,39 @@ function renderNodeResult(node) {
       `${sumOfChildBreakers} А. Автомат этого узла не подобран (расчётный ток вне диапазона таблицы) — проверка ` +
       'селективности невозможна.';
   }
+
+  nodeResBalance.textContent = '';
+  nodeResBalance.classList.remove('warn');
+  if (calc.balance) {
+    const { rawCurrent, breaker, cableAmpacity, overBreaker, overCable } = calc.balance;
+    const exceeded = [];
+    if (overBreaker) exceeded.push(`автомат узла (${breaker} А)`);
+    if (overCable) exceeded.push(`допустимый ток кабеля (${cableAmpacity} А)`);
+    nodeResBalance.textContent =
+      `⚠ Без учёта коэффициента одновременности (Кс = ${node.simultaneityFactor}) суммарный ток дочерних узлов ` +
+      `составил бы ${rawCurrent.toFixed(2)} А — это больше, чем ${exceeded.join(' и ')}. Защита узла держится ` +
+      'только на справедливости принятого Кс, без запаса: проверьте, действительно ли дочерние линии не работают ' +
+      'одновременно на полную нагрузку.';
+    nodeResBalance.classList.add('warn');
+  }
+
+  nodeResShortCircuit.textContent = '';
+  nodeResShortCircuit.classList.remove('warn');
+  if (calc.shortCircuit) {
+    const { i3, i1, curve, disconnection } = calc.shortCircuit;
+    let text =
+      `Приближённая оценка тока КЗ в этой точке: Iкз(3) ≈ ${formatShortCircuitCurrent(i3)}, Iкз(1) ≈ ` +
+      `${formatShortCircuitCurrent(i1)} (сопротивление кабелей выше по дереву накоплено от трансформатора; ` +
+      'индуктивные составляющие и сопротивление выше трансформатора не учитываются).';
+    if (disconnection) {
+      text += disconnection.ok
+        ? ` ✓ При характеристике ${curve} отключение заведомо быстрее нормативных 0,4 с / 0,2 с.`
+        : ` ✗ При характеристике ${curve} быстрое отключение не гарантировано — см. мини-калькулятор КЗ на ` +
+          'вкладке «Справка».';
+      nodeResShortCircuit.classList.toggle('warn', !disconnection.ok);
+    }
+    nodeResShortCircuit.textContent = text;
+  }
 }
 
 function renderPanel() {
@@ -911,6 +1083,12 @@ function renderPanel() {
   nodeCableLegend.textContent = isRoot ? 'Вводной кабель' : 'Кабель от родительского узла';
   nodeKcField.hidden = node.children.length === 0;
 
+  nodeTransformerField.hidden = !isRoot;
+  if (isRoot) {
+    nodeTransformerPowerInput.value = node.transformerPowerKva || '';
+    nodeTransformerUkInput.value = node.transformerUkPercent || '';
+  }
+
   updateNodeLoadFieldsUI();
   updateNodeKnownFieldsUI();
   updateNodeLoadTypeUI();
@@ -942,6 +1120,10 @@ function onPanelChange() {
   node.utilizationFactor = Number(nodeUtilizationInput.value) || 1;
   node.loadType = nodeLoadTypeSelect.value;
   node.startCurrentRatio = Number(nodeStartRatioInput.value) || DEFAULT_START_CURRENT_RATIO;
+  if (node.id === networkTree.id) {
+    node.transformerPowerKva = Number(nodeTransformerPowerInput.value) || null;
+    node.transformerUkPercent = Number(nodeTransformerUkInput.value) || null;
+  }
 
   netPanelTitle.textContent = node.name;
   updateNodeLoadFieldsUI();
@@ -961,6 +1143,7 @@ nodeNetworkTypeSelect.addEventListener('change', () => {
   nodePowerValueInput, nodePowerUnitSelect, nodeCurrentValueInput, nodeInstallationSelect,
   nodeCableCountInput, nodeCableLengthInput, nodeKcInput,
   nodeUtilizationInput, nodeLoadTypeSelect, nodeStartRatioInput,
+  nodeTransformerPowerInput, nodeTransformerUkInput,
   ...document.querySelectorAll('input[name="node-known"]'),
 ].forEach((el) => {
   el.addEventListener('input', onPanelChange);
@@ -969,12 +1152,25 @@ nodeNetworkTypeSelect.addEventListener('change', () => {
 
 calcNetworkBtn.addEventListener('click', () => {
   if (!networkTree) return;
-  const resultTree = calculateTree(networkTree);
+  const resultTree = annotateShortCircuit(networkTree, calculateTree(networkTree));
   lastCalcMap = flattenCalc(resultTree);
   const errors = collectErrors(resultTree);
   networkErrorMessage.textContent = errors.length ? `Не удалось рассчитать: ${errors.join('; ')}.` : '';
   renderTree();
   renderPanel();
+});
+
+undoNetworkBtn.addEventListener('click', () => {
+  if (!undoStack.length) return;
+  networkTree = undoStack.pop();
+  if (!findNode(networkTree, selectedNodeId)) selectedNodeId = networkTree.id;
+  lastCalcMap = null;
+  networkErrorMessage.textContent = '';
+  updateUndoButtonUI();
+  persistNetworkScheme();
+  renderTree();
+  renderPanel();
+  renderProjectList();
 });
 
 function sanitizeFileName(name) {
@@ -1025,8 +1221,66 @@ exportDxfBtn.addEventListener('click', () => {
   }
 });
 
+exportSpecBtn.addEventListener('click', () => {
+  if (!networkTree) return;
+  try {
+    const csv = buildSpecCsv(networkTree);
+    downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `${sanitizeFileName(networkTree.name)} — ведомость.csv`);
+    networkErrorMessage.textContent = '';
+  } catch (err) {
+    networkErrorMessage.textContent = `Не удалось построить ведомость: ${err.message}`;
+  }
+});
+
+const PROJECT_FILE_FORMAT = 'elapp-network-project';
+
+exportProjectBtn.addEventListener('click', () => {
+  if (!networkTree) return;
+  const data = JSON.stringify({ format: PROJECT_FILE_FORMAT, version: 1, tree: networkTree }, null, 2);
+  downloadBlob(new Blob([data], { type: 'application/json' }), `${sanitizeFileName(networkTree.name)}.json`);
+});
+
+importProjectBtn.addEventListener('click', () => importProjectInput.click());
+
+importProjectInput.addEventListener('change', () => {
+  const file = importProjectInput.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    importProjectInput.value = ''; // позволяет повторно выбрать тот же файл
+    let parsed;
+    try {
+      parsed = JSON.parse(String(reader.result));
+    } catch {
+      networkErrorMessage.textContent = 'Не удалось загрузить проект: файл не является корректным JSON.';
+      return;
+    }
+    const tree = parsed?.tree;
+    if (!tree || typeof tree !== 'object' || !Array.isArray(tree.children)) {
+      networkErrorMessage.textContent = 'Не удалось загрузить проект: файл не содержит схему сети в ожидаемом формате.';
+      return;
+    }
+    if (!confirm('Загрузить схему из файла? Текущая схема будет заменена.')) return;
+    pushUndo();
+    networkTree = tree;
+    selectedNodeId = networkTree.id;
+    activeProjectId = null; // загруженный из файла проект не привязан к сохранённому
+    lastCalcMap = null;
+    networkErrorMessage.textContent = '';
+    persistNetworkScheme();
+    renderTree();
+    renderPanel();
+    renderProjectList();
+  };
+  reader.onerror = () => {
+    networkErrorMessage.textContent = 'Не удалось прочитать файл проекта.';
+  };
+  reader.readAsText(file);
+});
+
 resetNetworkBtn.addEventListener('click', () => {
   if (!confirm('Удалить все узлы и параметры сети и начать сначала?')) return;
+  pushUndo();
   networkTree = buildDefaultTree();
   selectedNodeId = networkTree.id;
   activeProjectId = null;
@@ -1044,6 +1298,7 @@ openProjectBtn.addEventListener('click', () => {
   const project = networkProjectSelect.value ? getProject(networkProjectSelect.value) : null;
   if (!project) return;
   if (!confirm(`Открыть проект «${project.name}»? Текущая схема будет заменена схемой проекта.`)) return;
+  pushUndo();
   networkTree = project.tree;
   selectedNodeId = networkTree.id;
   activeProjectId = project.id;
@@ -1090,6 +1345,7 @@ networkTree = savedNetworkScheme ? savedNetworkScheme.tree : buildDefaultTree();
 selectedNodeId = networkTree.id;
 activeProjectId = savedNetworkScheme?.activeProjectId ?? null;
 if (!savedNetworkScheme) persistNetworkScheme();
+updateUndoButtonUI();
 renderTree();
 renderPanel();
 renderProjectList();

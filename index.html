@@ -188,8 +188,10 @@
       <p class="note">
         Соберите схему сети в виде дерева: корневой узел — точка ввода (главный щит), у него могут
         быть дочерние узлы — следующие щиты или потребители, соединённые линиями (кабелями). У каждого
-        блока есть свои кнопки: ⚙ — открыть параметры, + — добавить дочерний узел, − — удалить узел.
-        Кнопка «Рассчитать сеть» подбирает автоматы и кабели для всех линий дерева.
+        блока есть свои кнопки: ⚙ — открыть параметры, ⧉ — дублировать узел вместе с поддеревом,
+        ▾/▸ — свернуть/развернуть ветвь, + — добавить дочерний узел, − — удалить узел. Узел (кроме
+        корневого) можно перетащить на другой узел, чтобы перенести его вместе с поддеревом в новое
+        место схемы. Кнопка «Рассчитать сеть» подбирает автоматы и кабели для всех линий дерева.
       </p>
 
       <fieldset class="field-group net-projects">
@@ -215,16 +217,34 @@
           <button type="button" id="save-project-btn" class="btn-secondary" hidden>Сохранить изменения в проект</button>
         </div>
 
+        <div class="net-projects-row">
+          <button type="button" id="export-project-btn" class="btn-secondary btn-export"
+            title="Сохранить текущую схему в файл .json — для переноса между браузерами и устройствами">
+            ↧ Скачать проект (.json)
+          </button>
+          <button type="button" id="import-project-btn" class="btn-secondary"
+            title="Загрузить схему сети из файла .json">
+            ↥ Загрузить проект (.json)
+          </button>
+          <input type="file" id="import-project-input" accept="application/json,.json" hidden />
+        </div>
+
         <p id="network-project-status" class="note-line"></p>
       </fieldset>
 
       <div class="net-actions">
         <button type="button" id="calc-network-btn" class="btn-primary">Рассчитать сеть</button>
+        <button type="button" id="undo-network-btn" class="btn-secondary" title="Отменить последнее действие" disabled>
+          ↶ Отменить
+        </button>
         <button type="button" id="export-pdf-btn" class="btn-secondary btn-export" title="Сохранить однолинейную схему в PDF">
           ↧ Схема PDF
         </button>
         <button type="button" id="export-dxf-btn" class="btn-secondary btn-export" title="Сохранить однолинейную схему в DXF (открывается в AutoCAD и др. CAD)">
           ↧ Схема DXF
+        </button>
+        <button type="button" id="export-spec-btn" class="btn-secondary btn-export" title="Сохранить сводную ведомость линий сети в CSV (Excel)">
+          ↧ Ведомость CSV
         </button>
         <button type="button" id="reset-network-btn" class="btn-secondary" title="Удалить все узлы и параметры и начать сначала">
           ⟲ Сбросить сеть
@@ -322,6 +342,24 @@
           </fieldset>
         </div>
 
+        <fieldset class="field-group" id="node-transformer-field" hidden>
+          <legend>Параметры питающего трансформатора (для оценки тока КЗ)</legend>
+          <p class="note">
+            Необязательные параметры — заполните их, чтобы рядом с результатом каждого узла дерева
+            появилась приближённая оценка тока короткого замыкания (тот же метод, что в мини-калькуляторе
+            КЗ на вкладке «Справка», см. <a href="#ref-shortcircuit" class="ref-link">главу про токи КЗ</a>).
+            Без этих параметров остальной расчёт сети не меняется.
+          </p>
+          <div class="field">
+            <label for="node-transformer-power">Номинальная мощность трансформатора, Sт (кВА)</label>
+            <input type="number" id="node-transformer-power" inputmode="decimal" step="any" min="0" placeholder="не учитывать" />
+          </div>
+          <div class="field">
+            <label for="node-transformer-uk">Напряжение короткого замыкания, uк (%)</label>
+            <input type="number" id="node-transformer-uk" inputmode="decimal" step="0.1" min="0" placeholder="напр. 4,5" />
+          </div>
+        </fieldset>
+
         <fieldset class="field-group">
           <legend id="node-cable-legend">Кабель от родительского узла</legend>
 
@@ -379,6 +417,8 @@
             <p id="node-res-pe-section" class="note-line"></p>
             <p id="node-res-voltage-drop" class="note-line"></p>
             <p id="node-res-selectivity" class="note-line"></p>
+            <p id="node-res-balance" class="note-line"></p>
+            <p id="node-res-shortcircuit" class="note-line"></p>
           </div>
         </div>
       </section>
@@ -389,9 +429,14 @@
         нагрузки дочерних узлов (с учётом коэффициента одновременности Кс); для узлов с типом нагрузки
         «электродвигатель» дополнительно считается пусковой ток и подбирается устойчивая к нему
         характеристика автомата (B/C/D); селективность пары автоматов проверяется по приближённому
-        правилу кратности номинальных токов (см. результат узла). Ток и условия короткого замыкания
-        питающей сети, а также отключающая способность аппаратов в этом расчёте не определяются.
-        Окончательный выбор аппаратов защиты, сечений кабелей и полную проверку селективности (по
+        правилу кратности номинальных токов (см. результат узла). Если на корневом узле указаны
+        параметры питающего трансформатора, дополнительно выводится приближённая оценка тока короткого
+        замыкания и проверка времени отключения по характеристике автомата — тем же упрощённым методом,
+        что и в мини-калькуляторе КЗ на вкладке «Справка» (сопротивление кабелей выше трансформатора и
+        индуктивные составляющие не учитываются). Также проверяется баланс нагрузки: если сумма
+        нагрузок дочерних узлов без учёта коэффициента одновременности превысила бы автомат или
+        допустимый ток кабеля родительского узла, об этом выводится предупреждение. Окончательный выбор
+        аппаратов защиты, сечений кабелей, точный расчёт токов КЗ и полную проверку селективности (по
         времятоковым характеристикам производителя) выполняйте по полному проекту электроснабжения или
         доверьте специалисту.
       </p>
