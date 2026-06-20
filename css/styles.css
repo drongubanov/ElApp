@@ -601,6 +601,38 @@ input:focus {
   color: var(--color-text);
 }
 
+/* --- Поиск по дереву ------------------------------------------------------ */
+.net-search {
+  margin-bottom: 12px;
+}
+
+.net-search-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+#network-search-status {
+  display: block;
+  margin-top: 4px;
+  min-height: 1.1em;
+}
+
+/* Узлы вне результатов поиска притеняются, совпадения — подсвечиваются рамкой.
+   Переход по opacity уже задан на .net-node-wrap (используется и при наведении). */
+.net-tree.is-searching .net-node-wrap.search-dim {
+  opacity: 0.28;
+}
+
+.net-tree.is-searching .net-node-wrap.search-match .net-node {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+
 /* Только поле с деревом узлов выходит за ограничение ширины #tab-network (640px)
    и занимает всю ширину экрана — узлам нужно больше горизонтального места.
    Остальные блоки вкладки (заголовок, описание, кнопки, панель свойств) сужены

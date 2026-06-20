@@ -129,6 +129,8 @@ const networkErrorMessage = document.getElementById('network-error-message');
 const networkWarnings = document.getElementById('network-warnings');
 const netWarningsCount = document.getElementById('net-warnings-count');
 const netWarningsList = document.getElementById('net-warnings-list');
+const networkSearchInput = document.getElementById('network-search');
+const networkSearchStatus = document.getElementById('network-search-status');
 const networkPanel = document.getElementById('network-panel');
 const netPanelTitle = document.getElementById('net-panel-title');
 
@@ -310,6 +312,9 @@ let lastCalcMap = null;
 let lastResultTree = null;
 let activeProjectId = null;
 let draggedNodeId = null;
+let searchQuery = '';
+let searchMatchIds = new Set();
+let searchPathIds = new Set();
 
 const UNDO_LIMIT = 20;
 let undoStack = [];
@@ -395,6 +400,54 @@ function revealNode(nodeId) {
       .querySelector(`.net-node-wrap[data-id="${nodeId}"]`)
       ?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
   });
+}
+
+/**
+ * По поисковому запросу собирает множества id: matchIds — узлы, чьё название
+ * содержит запрос; pathIds — сами совпадения и все их предки (путь от корня),
+ * которые остаются яркими, тогда как остальные узлы притеняются.
+ */
+function computeSearchSets(query) {
+  const matchIds = new Set();
+  const pathIds = new Set();
+  const walk = (node, ancestors) => {
+    if (node.name.toLowerCase().includes(query)) {
+      matchIds.add(node.id);
+      pathIds.add(node.id);
+      ancestors.forEach((id) => pathIds.add(id));
+    }
+    node.children.forEach((child) => walk(child, [...ancestors, node.id]));
+  };
+  walk(networkTree, []);
+  return { matchIds, pathIds };
+}
+
+/** Разворачивает свёрнутые ветви, в поддереве которых есть совпадение с запросом. Возвращает true, если что-то изменилось. */
+function ensureMatchesVisible(query) {
+  let changed = false;
+  const walk = (node) => {
+    const selfMatch = node.name.toLowerCase().includes(query);
+    let descendantMatch = false;
+    node.children.forEach((child) => {
+      if (walk(child)) descendantMatch = true;
+    });
+    if (descendantMatch && node.collapsed) {
+      node.collapsed = false;
+      changed = true;
+    }
+    return selfMatch || descendantMatch;
+  };
+  walk(networkTree);
+  return changed;
+}
+
+/** Сбрасывает поисковый фильтр (при смене дерева — открытии/импорте/сбросе/отмене). */
+function clearSearch() {
+  searchQuery = '';
+  searchMatchIds = new Set();
+  searchPathIds = new Set();
+  networkSearchInput.value = '';
+  networkSearchStatus.textContent = '';
 }
 
 function persistNetworkScheme() {
@@ -542,6 +595,10 @@ function renderNodeEl(node) {
   wrap.className = 'net-node-wrap';
   wrap.dataset.id = node.id;
   if (node.children.length) wrap.classList.add('has-children');
+  if (searchQuery) {
+    if (searchMatchIds.has(node.id)) wrap.classList.add('search-match');
+    if (!searchPathIds.has(node.id)) wrap.classList.add('search-dim');
+  }
   wrap.addEventListener('mouseenter', () => highlightHoverPath(node.id));
   wrap.addEventListener('mouseleave', clearHoverPath);
 
@@ -717,6 +774,20 @@ function renderNodeEl(node) {
 function renderTree() {
   networkTreeEl.innerHTML = '';
   if (!networkTree) return;
+
+  if (searchQuery) {
+    const { matchIds, pathIds } = computeSearchSets(searchQuery);
+    searchMatchIds = matchIds;
+    searchPathIds = pathIds;
+    networkTreeEl.classList.add('is-searching');
+    networkSearchStatus.textContent = matchIds.size
+      ? `Найдено узлов: ${matchIds.size}.`
+      : 'Узлы с таким названием не найдены.';
+  } else {
+    networkTreeEl.classList.remove('is-searching');
+    networkSearchStatus.textContent = '';
+  }
+
   networkTreeEl.appendChild(renderNodeEl(networkTree));
   drawConnectors();
 }
@@ -1244,6 +1315,20 @@ calcNetworkBtn.addEventListener('click', () => {
   renderWarnings();
 });
 
+networkSearchInput.addEventListener('input', () => {
+  searchQuery = networkSearchInput.value.trim().toLowerCase();
+  // Развернём свёрнутые ветви, в которых есть совпадение, чтобы их было видно.
+  if (searchQuery && ensureMatchesVisible(searchQuery)) persistNetworkScheme();
+  renderTree();
+});
+
+networkSearchInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    clearSearch();
+    renderTree();
+  }
+});
+
 undoNetworkBtn.addEventListener('click', () => {
   if (!undoStack.length) return;
   networkTree = undoStack.pop();
@@ -1251,6 +1336,7 @@ undoNetworkBtn.addEventListener('click', () => {
   lastCalcMap = null;
   lastResultTree = null;
   networkErrorMessage.textContent = '';
+  clearSearch();
   updateUndoButtonUI();
   persistNetworkScheme();
   renderTree();
@@ -1382,6 +1468,7 @@ importProjectInput.addEventListener('change', () => {
     lastCalcMap = null;
     lastResultTree = null;
     networkErrorMessage.textContent = '';
+    clearSearch();
     persistNetworkScheme();
     renderTree();
     renderPanel();
@@ -1403,6 +1490,7 @@ resetNetworkBtn.addEventListener('click', () => {
   lastCalcMap = null;
   lastResultTree = null;
   networkErrorMessage.textContent = '';
+  clearSearch();
   persistNetworkScheme();
   renderTree();
   renderPanel();
@@ -1423,6 +1511,7 @@ openProjectBtn.addEventListener('click', () => {
   lastCalcMap = null;
   lastResultTree = null;
   networkErrorMessage.textContent = '';
+  clearSearch();
   persistNetworkScheme();
   renderTree();
   renderPanel();
