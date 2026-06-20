@@ -482,6 +482,11 @@ function drawConnectors() {
   svg.setAttribute('height', String(h));
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
 
+  // Кружки тока собираются отдельно и добавляются вторым проходом — после
+  // всех линий, чтобы непрозрачная заливка кружка всегда перекрывала любую
+  // линию (в т.ч. участки соседних ветвей), а не наоборот.
+  const currentMarks = [];
+
   tree.querySelectorAll('.net-node-wrap.has-children').forEach((wrap) => {
     const li = wrap.parentElement;
     const childUl = li.querySelector(':scope > ul');
@@ -507,10 +512,12 @@ function drawConnectors() {
       const calc = lastCalcMap?.get(childId);
       if (calc && !calc.error) {
         const midX = (px + cx) / 2;
-        svg.appendChild(buildConnectorCurrentMark(childId, midX, midY, calc.result.I));
+        currentMarks.push(buildConnectorCurrentMark(childId, midX, midY, calc.result.I));
       }
     });
   });
+
+  currentMarks.forEach((mark) => svg.appendChild(mark));
 }
 
 // Компактное представление тока для надписи внутри кружка на линии —
