@@ -1007,7 +1007,7 @@ function renderNodeEl(node) {
 
   if (calc?.balance) {
     const balanceBadge = document.createElement('span');
-    balanceBadge.className = 'net-node-badge warn';
+    balanceBadge.className = 'net-node-badge caution';
     balanceBadge.textContent = '⚠ баланс нагрузки';
     card.appendChild(balanceBadge);
   }
