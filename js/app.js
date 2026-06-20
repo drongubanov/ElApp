@@ -16,6 +16,7 @@ import { buildSheet } from './schemeSheet.js';
 import { buildSchemePdf } from './exportPdf.js';
 import { buildDxf } from './exportDxf.js';
 import { buildSpecCsv } from './schemeSpec.js';
+import { buildSpecSheet } from './specSheet.js';
 import { collectSchemeWarnings, VOLTAGE_DROP_LIMIT_PERCENT } from './schemeWarnings.js';
 import { NODE_TEMPLATES } from './nodeTemplates.js';
 import { loadHistory, saveHistoryEntry, deleteHistoryEntry, clearHistory } from './history.js';
@@ -116,6 +117,7 @@ const exportDropdown = document.getElementById('export-dropdown');
 const exportPdfBtn = document.getElementById('export-pdf-btn');
 const exportDxfBtn = document.getElementById('export-dxf-btn');
 const exportSpecBtn = document.getElementById('export-spec-btn');
+const exportSpecPdfBtn = document.getElementById('export-spec-pdf-btn');
 const resetNetworkBtn = document.getElementById('reset-network-btn');
 const networkProjectSelect = document.getElementById('network-project-select');
 const openProjectBtn = document.getElementById('open-project-btn');
@@ -1522,6 +1524,23 @@ exportSpecBtn.addEventListener('click', () => {
     networkErrorMessage.textContent = '';
   } catch (err) {
     networkErrorMessage.textContent = `Не удалось построить ведомость: ${err.message}`;
+  }
+});
+
+exportSpecPdfBtn.addEventListener('click', () => {
+  if (!networkTree) return;
+  try {
+    const sheet = buildSpecSheet(networkTree, {
+      title: networkTree.name,
+      date: formatDateTime(Date.now()),
+      sheet: 1,
+      sheets: 1,
+    });
+    const blob = buildSchemePdf(sheet);
+    downloadBlob(blob, `${sanitizeFileName(networkTree.name)} — ведомость.pdf`);
+    networkErrorMessage.textContent = '';
+  } catch (err) {
+    networkErrorMessage.textContent = `Не удалось построить ведомость PDF: ${err.message}`;
   }
 });
 

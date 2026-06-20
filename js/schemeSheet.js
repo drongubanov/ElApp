@@ -103,7 +103,7 @@ export function buildSheet(layout, meta = {}) {
   return { name: sheet.name, w: sheet.w, h: sheet.h, scale, segments, texts };
 }
 
-function addTitleBlock({ sheet, scale, meta, seg, rect, text }) {
+export function addTitleBlock({ sheet, scale, meta, seg, rect, text }) {
   const bw = TITLE_W;
   const bh = TITLE_H;
   const bx = sheet.w - FRAME.right - bw;
