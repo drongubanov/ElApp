@@ -2,6 +2,10 @@ import { calculate, calculateVoltageDrop, NETWORK_TYPES } from './calculations.j
 import { recommendProtection, INSTALLATION_LABELS, CABLE_TABLE, CABLE_TABLE_SOURCE } from './tables.js';
 import { calculateTree } from './network.js';
 import { loadNetworkScheme, saveNetworkScheme } from './networkStorage.js';
+import { buildSchemeLayout } from './schemeLayout.js';
+import { buildSheet } from './schemeSheet.js';
+import { buildSchemePdf } from './exportPdf.js';
+import { buildDxf } from './exportDxf.js';
 import { loadHistory, saveHistoryEntry, deleteHistoryEntry, clearHistory } from './history.js';
 import { formatPower, formatApparentPower, formatReactivePower, formatCurrent, formatDateTime } from './format.js';
 
@@ -73,6 +77,8 @@ const clearHistoryBtn = document.getElementById('clear-history-btn');
 
 const networkTreeEl = document.getElementById('network-tree');
 const calcNetworkBtn = document.getElementById('calc-network-btn');
+const exportPdfBtn = document.getElementById('export-pdf-btn');
+const exportDxfBtn = document.getElementById('export-dxf-btn');
 const resetNetworkBtn = document.getElementById('reset-network-btn');
 const networkErrorMessage = document.getElementById('network-error-message');
 const networkPanel = document.getElementById('network-panel');
@@ -663,6 +669,54 @@ calcNetworkBtn.addEventListener('click', () => {
   networkErrorMessage.textContent = errors.length ? `Не удалось рассчитать: ${errors.join('; ')}.` : '';
   renderTree();
   renderPanel();
+});
+
+function sanitizeFileName(name) {
+  return (name || 'Схема сети').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'Схема сети';
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function buildSchemeSheet() {
+  const layout = buildSchemeLayout(networkTree);
+  return buildSheet(layout, {
+    title: networkTree.name,
+    docName: 'Схема электрическая однолинейная',
+    date: formatDateTime(Date.now()),
+    sheet: 1,
+    sheets: 1,
+  });
+}
+
+exportPdfBtn.addEventListener('click', () => {
+  if (!networkTree) return;
+  try {
+    const blob = buildSchemePdf(buildSchemeSheet());
+    downloadBlob(blob, `${sanitizeFileName(networkTree.name)}.pdf`);
+    networkErrorMessage.textContent = '';
+  } catch (err) {
+    networkErrorMessage.textContent = `Не удалось построить PDF: ${err.message}`;
+  }
+});
+
+exportDxfBtn.addEventListener('click', () => {
+  if (!networkTree) return;
+  try {
+    const dxf = buildDxf(buildSchemeSheet());
+    downloadBlob(new Blob([dxf], { type: 'application/dxf' }), `${sanitizeFileName(networkTree.name)}.dxf`);
+    networkErrorMessage.textContent = '';
+  } catch (err) {
+    networkErrorMessage.textContent = `Не удалось построить DXF: ${err.message}`;
+  }
 });
 
 resetNetworkBtn.addEventListener('click', () => {
