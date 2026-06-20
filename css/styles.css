@@ -428,17 +428,26 @@ input:focus {
 .net-actions {
   display: flex;
   align-items: stretch;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 10px;
 }
 
-/* Все четыре кнопки в одну строку с одинаковой шириной и размером шрифта. */
+/* Действия делят строку поровну; меню экспорта (обёртка) ведёт себя как кнопка.
+   При нехватке места строка переносится (flex-wrap), а min-width: 0 не даёт
+   длинным надписям ломать раскладку. */
 .net-actions > .btn-primary,
-.net-actions > .btn-secondary {
-  flex: 1 1 0;
-  width: auto;
+.net-actions > .btn-secondary,
+.net-actions > .net-export-menu {
+  flex: 1 1 140px;
   min-width: 0;
-  padding: 12px 6px;
+}
+
+.net-actions > .btn-primary,
+.net-actions > .btn-secondary,
+.net-export-menu > .btn-export {
+  width: auto;
+  padding: 12px 10px;
   font-size: 0.95rem;
   text-align: center;
   white-space: nowrap;
@@ -450,6 +459,63 @@ input:focus {
    с кнопками экспорта/сброса (у тех рамка 1px) и ширина была одинаковой. */
 .net-actions > .btn-primary {
   border: 1px solid transparent;
+}
+
+/* --- Выпадающее меню экспорта --------------------------------------------- */
+.net-export-menu {
+  position: relative;
+  display: flex;
+}
+
+.net-export-menu > .btn-export {
+  width: 100%;
+}
+
+.net-export-menu > .btn-export.is-open {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.net-export-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.net-export-dropdown[hidden] {
+  display: none;
+}
+
+.net-export-dropdown > button {
+  display: block;
+  width: 100%;
+  padding: 11px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.net-export-dropdown > button:last-child {
+  border-bottom: none;
+}
+
+.net-export-dropdown > button:hover,
+.net-export-dropdown > button:focus-visible {
+  background: var(--color-surface-alt);
+  color: var(--color-accent);
+  outline: none;
 }
 
 /* Кнопки экспорта схем подсвечиваются зелёным при наведении. */
@@ -879,4 +945,48 @@ input:focus {
   color: var(--color-text-muted);
   font-size: 0.8rem;
   padding: 16px;
+}
+
+/* ===========================================================================
+   Адаптивность. До этого блока в стилях не было ни одного медиа-запроса —
+   на узких экранах строки кнопок и поля проекта переполнялись. Брейкпоинт
+   ~600px разделяет «узкий экран» (телефон) и обычный.
+   =========================================================================== */
+@media (max-width: 600px) {
+  .app-header {
+    padding: 16px 12px 4px;
+  }
+
+  .app-header h1 {
+    font-size: 1.45rem;
+  }
+
+  main {
+    padding: 0 12px 32px;
+  }
+
+  /* Кнопки действий сети — ровно по две в ряд (вместо «резинового» переноса),
+     с читаемыми подписями и достаточной высотой касания. */
+  .net-actions > .btn-primary,
+  .net-actions > .btn-secondary,
+  .net-actions > .net-export-menu {
+    flex: 1 1 calc(50% - 5px);
+  }
+
+  /* Поля и кнопки управления проектами растягиваются на всю ширину строки —
+     ничего не «жмётся» и не обрезается. */
+  .net-projects-row .field,
+  .net-projects-row > .btn-secondary {
+    flex: 1 1 100%;
+  }
+
+  /* Панель параметров узла: меньше внутренних отступов, поля во всю ширину. */
+  .net-panel {
+    padding: 12px;
+  }
+
+  .net-panel select,
+  .net-panel input[type='number'] {
+    max-width: none;
+  }
 }

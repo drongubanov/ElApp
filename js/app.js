@@ -111,6 +111,8 @@ const clearHistoryBtn = document.getElementById('clear-history-btn');
 const networkTreeEl = document.getElementById('network-tree');
 const calcNetworkBtn = document.getElementById('calc-network-btn');
 const undoNetworkBtn = document.getElementById('undo-network-btn');
+const exportMenuBtn = document.getElementById('export-menu-btn');
+const exportDropdown = document.getElementById('export-dropdown');
 const exportPdfBtn = document.getElementById('export-pdf-btn');
 const exportDxfBtn = document.getElementById('export-dxf-btn');
 const exportSpecBtn = document.getElementById('export-spec-btn');
@@ -1198,6 +1200,34 @@ function buildSchemeSheet() {
     sheets: 1,
   });
 }
+
+// Выпадающее меню экспорта: открывается по кнопке, закрывается по выбору
+// пункта, клику вне меню или клавише Esc.
+function setExportMenuOpen(open) {
+  exportDropdown.hidden = !open;
+  exportMenuBtn.setAttribute('aria-expanded', String(open));
+  exportMenuBtn.classList.toggle('is-open', open);
+}
+
+exportMenuBtn.addEventListener('click', (event) => {
+  event.stopPropagation();
+  setExportMenuOpen(exportDropdown.hidden);
+});
+
+exportDropdown.addEventListener('click', () => setExportMenuOpen(false));
+
+document.addEventListener('click', (event) => {
+  if (!exportDropdown.hidden && !event.target.closest('.net-export-menu')) {
+    setExportMenuOpen(false);
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !exportDropdown.hidden) {
+    setExportMenuOpen(false);
+    exportMenuBtn.focus();
+  }
+});
 
 exportPdfBtn.addEventListener('click', () => {
   if (!networkTree) return;
