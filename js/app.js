@@ -11,6 +11,8 @@ import { calculateShortCircuit, checkDisconnectionByCurve } from './shortCircuit
 import { calculateTree, annotateShortCircuit, DEFAULT_START_CURRENT_RATIO } from './network.js';
 import { loadNetworkScheme, saveNetworkScheme } from './networkStorage.js';
 import { loadProjects, getProject, saveProject, deleteProject } from './networkProjects.js';
+import { loadSnapshots, getSnapshot, saveSnapshot, deleteSnapshot } from './schemeSnapshots.js';
+import { diffSchemes, hasDiff } from './schemeDiff.js';
 import { buildSchemeLayout } from './schemeLayout.js';
 import { buildSheet } from './schemeSheet.js';
 import { buildSchemePdf } from './exportPdf.js';
@@ -129,6 +131,13 @@ const exportProjectBtn = document.getElementById('export-project-btn');
 const importProjectBtn = document.getElementById('import-project-btn');
 const importProjectInput = document.getElementById('import-project-input');
 const networkProjectStatus = document.getElementById('network-project-status');
+const saveVersionBtn = document.getElementById('save-version-btn');
+const networkVersionSelect = document.getElementById('network-version-select');
+const compareVersionBtn = document.getElementById('compare-version-btn');
+const deleteVersionBtn = document.getElementById('delete-version-btn');
+const networkDiff = document.getElementById('network-diff');
+const networkDiffTitle = document.getElementById('network-diff-title');
+const networkDiffList = document.getElementById('network-diff-list');
 const networkErrorMessage = document.getElementById('network-error-message');
 const networkWarnings = document.getElementById('network-warnings');
 const netWarningsCount = document.getElementById('net-warnings-count');
@@ -490,6 +499,75 @@ function updateProjectControlsUI(projects = loadProjects()) {
   networkProjectStatus.textContent = activeProject
     ? `Текущая схема — проект «${activeProject.name}», сохранён ${formatDateTime(activeProject.updatedAt)}.`
     : 'Текущая схема не сохранена как проект — нажмите «Сохранить как новый проект…», чтобы не потерять её.';
+}
+
+// --- Версии схемы и сравнение ----------------------------------------------
+function renderVersionList() {
+  const snapshots = loadSnapshots();
+  const previousValue = networkVersionSelect.value;
+  networkVersionSelect.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = snapshots.length ? '— выберите версию —' : '— нет сохранённых версий —';
+  networkVersionSelect.appendChild(placeholder);
+  snapshots.forEach((snapshot) => {
+    const option = document.createElement('option');
+    option.value = snapshot.id;
+    option.textContent = `${snapshot.label} — ${formatDateTime(snapshot.createdAt)}`;
+    networkVersionSelect.appendChild(option);
+  });
+  if (snapshots.some((snapshot) => snapshot.id === previousValue)) networkVersionSelect.value = previousValue;
+  updateVersionControlsUI();
+}
+
+function updateVersionControlsUI() {
+  const selectedId = networkVersionSelect.value;
+  compareVersionBtn.disabled = !selectedId;
+  deleteVersionBtn.disabled = !selectedId;
+}
+
+const DIFF_FIELD_LABELS = { P: 'мощность P', I: 'ток I', breaker: 'автомат', error: 'расчёт' };
+
+function formatDiffValue(key, value) {
+  if (value == null) return '—';
+  if (key === 'P') return formatPower(value);
+  if (key === 'I') return formatCurrent(value);
+  if (key === 'breaker') return `${value} А`;
+  if (key === 'error') return 'ошибка';
+  return String(value);
+}
+
+function renderDiff(diff, label) {
+  networkDiff.hidden = false;
+  networkDiffList.innerHTML = '';
+  networkDiffTitle.textContent = `Сравнение версии «${label}» с текущей схемой`;
+
+  if (!hasDiff(diff)) {
+    const li = document.createElement('li');
+    li.className = 'net-diff-item ok';
+    li.textContent = '✓ Различий нет — текущая схема совпадает с этой версией.';
+    networkDiffList.appendChild(li);
+    return;
+  }
+
+  const addItem = (cls, text) => {
+    const li = document.createElement('li');
+    li.className = `net-diff-item ${cls}`;
+    li.textContent = text;
+    networkDiffList.appendChild(li);
+  };
+
+  diff.added.forEach((node) => addItem('added', `+ Добавлен узел «${node.name}»`));
+  diff.removed.forEach((node) => addItem('removed', `− Удалён узел «${node.name}»`));
+  diff.changed.forEach((node) => {
+    const parts = node.fields.map((field) => {
+      if (field.key === 'error') {
+        return field.to ? 'появилась ошибка расчёта' : 'ошибка расчёта устранена';
+      }
+      return `${DIFF_FIELD_LABELS[field.key]}: ${formatDiffValue(field.key, field.from)} → ${formatDiffValue(field.key, field.to)}`;
+    });
+    addItem('changed', `~ «${node.name}»: ${parts.join('; ')}`);
+  });
 }
 
 function nodeTag(node) {
@@ -1682,6 +1760,33 @@ deleteProjectBtn.addEventListener('click', () => {
   renderProjectList();
 });
 
+saveVersionBtn.addEventListener('click', () => {
+  if (!networkTree) return;
+  const defaultLabel = `${networkTree.name} — ${formatDateTime(Date.now())}`;
+  const label = prompt('Название версии:', defaultLabel);
+  if (label === null) return;
+  const trimmed = label.trim() || defaultLabel;
+  saveSnapshot({ label: trimmed, tree: structuredClone(networkTree) });
+  renderVersionList();
+});
+
+networkVersionSelect.addEventListener('change', () => updateVersionControlsUI());
+
+compareVersionBtn.addEventListener('click', () => {
+  const snapshot = networkVersionSelect.value ? getSnapshot(networkVersionSelect.value) : null;
+  if (!snapshot || !networkTree) return;
+  renderDiff(diffSchemes(snapshot.tree, networkTree), snapshot.label);
+});
+
+deleteVersionBtn.addEventListener('click', () => {
+  const snapshot = networkVersionSelect.value ? getSnapshot(networkVersionSelect.value) : null;
+  if (!snapshot) return;
+  if (!confirm(`Удалить версию «${snapshot.label}»? Это действие нельзя отменить.`)) return;
+  deleteSnapshot(snapshot.id);
+  networkDiff.hidden = true;
+  renderVersionList();
+});
+
 const savedNetworkScheme = loadNetworkScheme();
 networkTree = savedNetworkScheme ? savedNetworkScheme.tree : buildDefaultTree();
 selectedNodeId = networkTree.id;
@@ -1691,6 +1796,7 @@ updateUndoButtonUI();
 renderTree();
 renderPanel();
 renderProjectList();
+renderVersionList();
 
 function showError(message) {
   errorMessage.textContent = message;
