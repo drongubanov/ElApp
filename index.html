@@ -80,6 +80,7 @@
             <p class="note">
               Если введённая мощность — установленная (паспортная), а не фактическая средняя нагрузка,
               укажите Ku &lt; 1, чтобы получить более реалистичную расчётную нагрузку (Pр = Ku · Pуст).
+              <a class="ref-link" href="#ref-loads">Подробнее: расчёт нагрузок →</a>
             </p>
           </div>
 
@@ -89,6 +90,9 @@
               <option value="general" selected>Общая (без пускового тока)</option>
               <option value="motor">Электродвигатель (с пусковым током)</option>
             </select>
+            <p class="note">
+              <a class="ref-link" href="#ref-motors">Подробнее: пусковые токи двигателей →</a>
+            </p>
           </div>
 
           <div class="field" id="start-ratio-field" hidden>
@@ -150,9 +154,16 @@
           <p id="res-load-diagram" class="note-line"></p>
           <p id="res-breaker"></p>
           <p id="res-cable"></p>
+          <p id="res-pe-section" class="note-line"></p>
           <p id="res-correction" class="note-line"></p>
           <p id="res-voltage-drop" class="note-line"></p>
           <p id="res-pue-check" class="note-line"></p>
+          <p class="ref-links-line note-line">
+            Как подбираются эти значения — в справочнике:
+            <a class="ref-link" href="#ref-breakers">Автоматы</a>,
+            <a class="ref-link" href="#ref-cables">Сечение кабеля</a>,
+            <a class="ref-link" href="#ref-grounding">PE/PEN-проводник</a>.
+          </p>
           <button type="button" id="goto-ref-table-btn" class="btn-secondary btn-link" hidden>
             Сверить с таблицей ПУЭ-7 →
           </button>
@@ -365,6 +376,7 @@
             <p id="node-res-load-diagram" class="note-line"></p>
             <p id="node-res-breaker"></p>
             <p id="node-res-cable"></p>
+            <p id="node-res-pe-section" class="note-line"></p>
             <p id="node-res-voltage-drop" class="note-line"></p>
             <p id="node-res-selectivity" class="note-line"></p>
           </div>
@@ -761,18 +773,17 @@
 
       <h3 class="ref-chapter" id="ref-shortcircuit">9. Токи короткого замыкания</h3>
       <article class="formula-block">
-        <h3>Почему это важно и что не считает приложение</h3>
+        <h3>Зачем нужен ток КЗ</h3>
         <p><code>I<sub>кз</sub> = U<sub>ф</sub> / Z<sub>п</sub></code></p>
         <p class="note">
           Ток короткого замыкания в точке установки аппарата зависит от полного сопротивления петли КЗ
           Z<sub>п</sub> — суммы сопротивлений питающего трансформатора (или иного источника), всех
-          кабельных участков и контактных соединений от источника до точки КЗ. Калькулятор и конструктор
-          сети не запрашивают параметры источника питания (мощность и сопротивление трансформатора,
-          сопротивление питающей сети до ввода) и поэтому I<sub>кз</sub> не определяют — это
-          принципиальное ограничение, а не упущение: без данных об источнике результат был бы
-          недостоверным. Знание I<sub>кз</sub> необходимо для двух проверок, которые нужно выполнить
-          отдельно: подбора отключающей способности автоматов Icu ≥ I<sub>кз</sub> (гл. 6) и проверки
-          времени автоматического отключения при пробое изоляции на корпус (ниже).
+          кабельных участков и контактных соединений от источника до точки КЗ. Основной расчёт
+          калькулятора и конструктора сети не запрашивает параметры источника питания и I<sub>кз</sub>
+          не определяет. Чтобы закрыть это «слепое пятно», ниже добавлен отдельный приближённый
+          мини-калькулятор тока КЗ. Знание I<sub>кз</sub> необходимо для двух проверок: подбора
+          отключающей способности автоматов Icu ≥ I<sub>кз</sub> (гл. 6) и проверки времени
+          автоматического отключения при пробое изоляции на корпус (далее).
         </p>
       </article>
       <article class="formula-block">
@@ -783,9 +794,85 @@
           по ГОСТ Р 50571.3, ориентировочно 0.4 с для номинального напряжения 220 В и 0.2 с для 380 В
           (система TN, нормируемое время для прямого/непрямого прикосновения; точные значения по полной
           таблице стандарта зависят от диапазона напряжения). Это требует, чтобы ток однофазного КЗ
-          «фаза — PE» был достаточен для срабатывания автомата за нормативное время — без расчёта
-          I<sub>кз</sub> (см. выше) эта проверка не выполняется автоматически.
+          «фаза — PE» был достаточен для срабатывания автомата за нормативное время — оценить его
+          можно в мини-калькуляторе ниже.
         </p>
+      </article>
+
+      <article class="formula-block sc-calc" id="sc-calculator">
+        <h3>Мини-калькулятор тока КЗ (приближённая оценка)</h3>
+        <p class="note">
+          Оцените ток короткого замыкания в конце линии по параметрам питающего трансформатора и кабеля
+          до точки. Метод упрощённый (учитываются активные сопротивления трансформатора и кабеля,
+          индуктивные сопротивления и параметры сети выше трансформатора не учитываются) и пригоден
+          только для предварительной прикидки.
+        </p>
+
+        <div class="sc-grid">
+          <div class="field">
+            <label for="sc-line-voltage">Линейное напряжение U<sub>л</sub>, В</label>
+            <input type="number" id="sc-line-voltage" inputmode="decimal" step="any" min="0" value="400" />
+          </div>
+          <div class="field">
+            <label for="sc-transformer-power">Мощность трансформатора S<sub>т</sub>, кВА</label>
+            <input type="number" id="sc-transformer-power" inputmode="decimal" step="any" min="0" placeholder="250" />
+          </div>
+          <div class="field">
+            <label for="sc-uk">Напряжение КЗ трансформатора u<sub>к</sub>, %</label>
+            <input type="number" id="sc-uk" inputmode="decimal" step="0.1" min="0" value="4.5" />
+          </div>
+          <div class="field">
+            <label for="sc-material">Материал жилы кабеля</label>
+            <select id="sc-material">
+              <option value="copper" selected>Медь</option>
+              <option value="aluminum">Алюминий</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="sc-length">Длина кабеля до точки L, м</label>
+            <input type="number" id="sc-length" inputmode="decimal" step="any" min="0" placeholder="30" />
+          </div>
+          <div class="field">
+            <label for="sc-section">Сечение жилы S, мм²</label>
+            <input type="number" id="sc-section" inputmode="decimal" step="any" min="0" placeholder="16" />
+          </div>
+        </div>
+
+        <p class="note">Необязательно — для проверки автомата в этой точке:</p>
+        <div class="sc-grid">
+          <div class="field">
+            <label for="sc-breaker">Номинал автомата I<sub>н</sub>, А</label>
+            <input type="number" id="sc-breaker" inputmode="decimal" step="any" min="0" placeholder="не проверять" />
+          </div>
+          <div class="field">
+            <label for="sc-curve">Характеристика</label>
+            <select id="sc-curve">
+              <option value="B">B</option>
+              <option value="C" selected>C</option>
+              <option value="D">D</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="sc-icu">Отключающая способность Icu, кА</label>
+            <input type="number" id="sc-icu" inputmode="decimal" step="any" min="0" placeholder="не проверять" />
+          </div>
+        </div>
+
+        <button type="button" id="sc-calc-btn" class="btn-primary">Оценить ток КЗ</button>
+        <p class="error-message" id="sc-error" role="alert"></p>
+
+        <div id="sc-result" hidden>
+          <p id="sc-res-impedance" class="note-line"></p>
+          <p id="sc-res-i3"></p>
+          <p id="sc-res-i1"></p>
+          <p id="sc-res-icu" class="note-line"></p>
+          <p id="sc-res-time" class="note-line"></p>
+          <p class="note">
+            Это ориентировочная оценка. Для проекта токи КЗ рассчитывают по полной методике (ГОСТ Р
+            50571.4.3) с учётом индуктивных сопротивлений, сопротивления петли «фаза — нуль/PE» и
+            параметров питающей сети.
+          </p>
+        </div>
       </article>
 
       <h3 class="ref-chapter" id="ref-grounding">10. Заземление и системы TN / TT / IT</h3>
@@ -929,24 +1016,61 @@
 
       <h3 class="ref-chapter" id="ref-glossary">15. Глоссарий и единицы измерения</h3>
       <article class="formula-block">
-        <dl>
-          <dt>Активная мощность (P), Вт</dt>
-          <dd>Мощность, преобразуемая нагрузкой в полезную работу (тепло, свет, механическую работу).</dd>
-          <dt>Реактивная мощность (Q), вар</dt>
-          <dd>Мощность, циркулирующая между источником и индуктивной/ёмкостной составляющей нагрузки без совершения полезной работы.</dd>
-          <dt>Полная мощность (S), ВА</dt>
-          <dd>Геометрическая сумма активной и реактивной мощности; то, что фактически передаёт источник.</dd>
-          <dt>Коэффициент использования (Kи)</dt>
-          <dd>Отношение средней мощности, потребляемой за наиболее загруженную смену, к установленной мощности.</dd>
-          <dt>Коэффициент одновременности, спроса (Kс)</dt>
-          <dd>Отношение фактической суммарной нагрузки группы приёмников к сумме их индивидуальных расчётных нагрузок.</dd>
-          <dt>Кратность пускового тока (Kп)</dt>
-          <dd>Отношение пускового тока электродвигателя к его номинальному току.</dd>
-          <dt>Селективность защиты</dt>
-          <dd>Свойство защитных аппаратов отключать только повреждённый участок сети, не затрагивая исправные.</dd>
-          <dt>Отключающая способность (Icu, Ics)</dt>
-          <dd>Наибольший ток короткого замыкания, который автомат способен отключить (предельная/рабочая способность).</dd>
+        <div class="field glossary-search">
+          <label for="glossary-search">Поиск по глоссарию</label>
+          <input type="search" id="glossary-search" placeholder="Например: реактивная, селективность, Icu…" autocomplete="off" />
+        </div>
+        <dl id="glossary-list">
+          <div class="glossary-item">
+            <dt>Активная мощность (P), Вт</dt>
+            <dd>Мощность, преобразуемая нагрузкой в полезную работу (тепло, свет, механическую работу).</dd>
+          </div>
+          <div class="glossary-item">
+            <dt>Реактивная мощность (Q), вар</dt>
+            <dd>Мощность, циркулирующая между источником и индуктивной/ёмкостной составляющей нагрузки без совершения полезной работы.</dd>
+          </div>
+          <div class="glossary-item">
+            <dt>Полная мощность (S), ВА</dt>
+            <dd>Геометрическая сумма активной и реактивной мощности; то, что фактически передаёт источник.</dd>
+          </div>
+          <div class="glossary-item">
+            <dt>Коэффициент использования (Kи)</dt>
+            <dd>Отношение средней мощности, потребляемой за наиболее загруженную смену, к установленной мощности.</dd>
+          </div>
+          <div class="glossary-item">
+            <dt>Коэффициент одновременности, спроса (Kс)</dt>
+            <dd>Отношение фактической суммарной нагрузки группы приёмников к сумме их индивидуальных расчётных нагрузок.</dd>
+          </div>
+          <div class="glossary-item">
+            <dt>Кратность пускового тока (Kп)</dt>
+            <dd>Отношение пускового тока электродвигателя к его номинальному току.</dd>
+          </div>
+          <div class="glossary-item">
+            <dt>Селективность защиты</dt>
+            <dd>Свойство защитных аппаратов отключать только повреждённый участок сети, не затрагивая исправные.</dd>
+          </div>
+          <div class="glossary-item">
+            <dt>Отключающая способность (Icu, Ics)</dt>
+            <dd>Наибольший ток короткого замыкания, который автомат способен отключить (предельная/рабочая способность).</dd>
+          </div>
+          <div class="glossary-item">
+            <dt>Ток короткого замыкания (Iкз)</dt>
+            <dd>Ток при замыкании между проводниками с малым сопротивлением; определяет требования к отключающей способности и времени отключения аппаратов.</dd>
+          </div>
+          <div class="glossary-item">
+            <dt>Напряжение КЗ трансформатора (uк), %</dt>
+            <dd>Доля номинального напряжения, при которой по короткозамкнутой вторичной обмотке протекает номинальный ток; характеризует внутреннее сопротивление трансформатора.</dd>
+          </div>
+          <div class="glossary-item">
+            <dt>Защитный проводник (PE)</dt>
+            <dd>Проводник для защиты от поражения электротоком, соединяющий открытые проводящие части с заземлением.</dd>
+          </div>
+          <div class="glossary-item">
+            <dt>Совмещённый проводник (PEN)</dt>
+            <dd>Проводник, совмещающий функции нулевого рабочего (N) и защитного (PE) проводников.</dd>
+          </div>
         </dl>
+        <p class="note" id="glossary-empty" hidden>По запросу ничего не найдено.</p>
       </article>
 
       <h3 class="ref-chapter" id="ref-standards">16. Нормативные документы</h3>

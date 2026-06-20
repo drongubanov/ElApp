@@ -29,6 +29,26 @@ export const CABLE_TABLE = [
 
 export const BREAKER_RATINGS = [6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 320, 400];
 
+// Стандартный ряд сечений жил (мм²) — берётся из таблицы допустимых токов.
+export const STANDARD_SECTIONS = CABLE_TABLE.map((row) => row.section);
+
+/**
+ * Минимальное сечение защитного (PE) или совмещённого (PEN) проводника по
+ * сечению фазного проводника S (ПУЭ-7, табл. 1.7.5 / ГОСТ Р 50571.5.54):
+ *   S ≤ 16 мм²        → сечение PE равно фазному;
+ *   16 < S ≤ 35 мм²   → сечение PE принимается 16 мм²;
+ *   S > 35 мм²        → сечение PE не менее половины фазного.
+ * Для S > 35 результат округляется вверх до ближайшего стандартного сечения.
+ */
+export function recommendPeSection(phaseSection) {
+  if (!(phaseSection > 0)) return null;
+  let minSection;
+  if (phaseSection <= 16) minSection = phaseSection;
+  else if (phaseSection <= 35) minSection = 16;
+  else minSection = phaseSection / 2;
+  return STANDARD_SECTIONS.find((section) => section >= minSection) ?? minSection;
+}
+
 /** Наименьший стандартный номинал автомата, не меньший расчётного тока. */
 export function selectBreaker(current) {
   return BREAKER_RATINGS.find((rating) => rating >= current) ?? null;

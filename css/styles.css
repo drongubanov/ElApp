@@ -815,6 +815,52 @@ input:focus {
   overflow-x: auto;
 }
 
+/* Перекрёстные ссылки из калькулятора в справочник */
+.ref-link {
+  color: var(--color-accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ref-link:hover {
+  text-decoration: underline;
+}
+
+.ref-links-line a {
+  margin-right: 4px;
+}
+
+/* Мини-калькулятор тока КЗ */
+.sc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0 16px;
+}
+
+.sc-calc .btn-primary {
+  margin-top: 8px;
+}
+
+#sc-result {
+  margin-top: 14px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+}
+
+/* Поиск по глоссарию */
+.glossary-search {
+  margin-bottom: 14px;
+}
+
+.glossary-item {
+  margin-bottom: 10px;
+}
+
+.glossary-item dt {
+  font-weight: 600;
+  margin-top: 0;
+}
+
 .app-footer {
   text-align: center;
   color: var(--color-text-muted);

@@ -1,11 +1,13 @@
 import { calculate, calculateVoltageDrop, NETWORK_TYPES } from './calculations.js';
 import {
   recommendProtection,
+  recommendPeSection,
   INSTALLATION_LABELS,
   CABLE_TABLE,
   CABLE_TABLE_SOURCE,
   SELECTIVITY_SAFE_RATIO,
 } from './tables.js';
+import { calculateShortCircuit, checkDisconnectionByCurve } from './shortCircuit.js';
 import { calculateTree, DEFAULT_START_CURRENT_RATIO } from './network.js';
 import { loadNetworkScheme, saveNetworkScheme } from './networkStorage.js';
 import { loadProjects, getProject, saveProject, deleteProject } from './networkProjects.js';
@@ -29,6 +31,22 @@ const NETWORK_SHORT_LABELS = {
   [NETWORK_TYPES.AC1]: '1~',
   [NETWORK_TYPES.AC3]: '3~',
 };
+
+/**
+ * Текст рекомендации по сечению PE/PEN-проводника для рассчитанной защиты:
+ * по правилу ПУЭ-7 (табл. 1.7.5) от сечения фазного проводника. Для меди и
+ * алюминия фазные сечения различаются, поэтому показываем оба, если оба
+ * подобраны. Пустая строка — если ни одно сечение не подобрано.
+ */
+function buildPeSectionText(protection) {
+  const parts = [];
+  const copperSection = protection.copperCable?.section;
+  const aluminumSection = protection.aluminumCable?.section;
+  if (copperSection != null) parts.push(`медь ${copperSection} мм² → не менее ${recommendPeSection(copperSection)} мм²`);
+  if (aluminumSection != null) parts.push(`алюминий ${aluminumSection} мм² → не менее ${recommendPeSection(aluminumSection)} мм²`);
+  if (!parts.length) return '';
+  return `Минимальное сечение PE/PEN-проводника (по ПУЭ-7, табл. 1.7.5): ${parts.join('; ')}.`;
+}
 
 function pluralize(n, one, few, many) {
   const mod10 = n % 10;
@@ -77,6 +95,7 @@ const resI = document.getElementById('res-i');
 const resLoadDiagram = document.getElementById('res-load-diagram');
 const resBreaker = document.getElementById('res-breaker');
 const resCable = document.getElementById('res-cable');
+const resPeSection = document.getElementById('res-pe-section');
 const resCorrection = document.getElementById('res-correction');
 const resVoltageDrop = document.getElementById('res-voltage-drop');
 const resPueCheck = document.getElementById('res-pue-check');
@@ -136,6 +155,7 @@ const nodeResI = document.getElementById('node-res-i');
 const nodeResLoadDiagram = document.getElementById('node-res-load-diagram');
 const nodeResBreaker = document.getElementById('node-res-breaker');
 const nodeResCable = document.getElementById('node-res-cable');
+const nodeResPeSection = document.getElementById('node-res-pe-section');
 const nodeResVoltageDrop = document.getElementById('node-res-voltage-drop');
 const nodeResSelectivity = document.getElementById('node-res-selectivity');
 
@@ -821,6 +841,8 @@ function renderNodeResult(node) {
     ? `Рекомендуемое сечение кабеля: ${cableParts.join('; ')}`
     : 'Расчётный ток превышает диапазон табличных сечений — требуется индивидуальный подбор кабеля.';
 
+  nodeResPeSection.textContent = buildPeSectionText(protection);
+
   nodeResVoltageDrop.textContent = '';
   nodeResVoltageDrop.classList.remove('warn');
   if (voltageDrop) {
@@ -1113,6 +1135,8 @@ function renderResults(result, protection, line, extra = {}) {
     ? `Рекомендуемое сечение кабеля: ${cableParts.join('; ')}`
     : 'Расчётный ток превышает диапазон табличных сечений — требуется индивидуальный подбор кабеля.';
 
+  resPeSection.textContent = buildPeSectionText(protection);
+
   const methodLabel = INSTALLATION_LABELS[line.installationMethod] ?? '';
   resCorrection.textContent = protection.correction < 1
     ? `Условия прокладки: ${methodLabel}, кабелей рядом — ${line.cableCount} (поправочный коэффициент ×${protection.correction.toFixed(2)}).`
@@ -1309,6 +1333,134 @@ form.addEventListener('submit', (event) => {
     },
     { persist: true },
   );
+});
+
+// --- Перекрёстные ссылки из калькулятора в справочник -----------------------
+// Ссылки с классом ref-link открывают вкладку «Справка» и прокручивают к
+// нужной главе (внутри неактивной вкладки якоря не работают сами по себе).
+document.addEventListener('click', (event) => {
+  const link = event.target.closest('a.ref-link');
+  if (!link) return;
+  event.preventDefault();
+  const targetId = (link.getAttribute('href') || '').replace('#', '');
+  if (!targetId) return;
+  switchTab('about');
+  requestAnimationFrame(() => {
+    document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+
+// --- Мини-калькулятор тока КЗ ------------------------------------------------
+const scLineVoltageInput = document.getElementById('sc-line-voltage');
+const scTransformerPowerInput = document.getElementById('sc-transformer-power');
+const scUkInput = document.getElementById('sc-uk');
+const scMaterialSelect = document.getElementById('sc-material');
+const scLengthInput = document.getElementById('sc-length');
+const scSectionInput = document.getElementById('sc-section');
+const scBreakerInput = document.getElementById('sc-breaker');
+const scCurveSelect = document.getElementById('sc-curve');
+const scIcuInput = document.getElementById('sc-icu');
+const scCalcBtn = document.getElementById('sc-calc-btn');
+const scError = document.getElementById('sc-error');
+const scResult = document.getElementById('sc-result');
+const scResImpedance = document.getElementById('sc-res-impedance');
+const scResI3 = document.getElementById('sc-res-i3');
+const scResI1 = document.getElementById('sc-res-i1');
+const scResIcu = document.getElementById('sc-res-icu');
+const scResTime = document.getElementById('sc-res-time');
+
+/** Ток КЗ в А или кА (для крупных значений) с разделителями разрядов. */
+function formatShortCircuitCurrent(amps) {
+  if (amps >= 1000) {
+    return `${(amps / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} кА (${amps.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} А)`;
+  }
+  return `${amps.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} А`;
+}
+
+function runShortCircuitCalculation() {
+  scError.textContent = '';
+  const lineVoltage = Number(scLineVoltageInput.value);
+  const ratedPowerKva = Number(scTransformerPowerInput.value);
+  const shortCircuitVoltagePercent = Number(scUkInput.value);
+  const material = scMaterialSelect.value;
+  const length = Number(scLengthInput.value);
+  const section = Number(scSectionInput.value);
+
+  if (!(lineVoltage > 0) || !(ratedPowerKva > 0) || !(shortCircuitVoltagePercent > 0)
+    || !(length > 0) || !(section > 0)) {
+    scResult.hidden = true;
+    scError.textContent =
+      'Заполните напряжение, мощность и uк трансформатора, длину и сечение кабеля положительными числами.';
+    return;
+  }
+
+  let r;
+  try {
+    r = calculateShortCircuit({ lineVoltage, ratedPowerKva, shortCircuitVoltagePercent, length, section, material });
+  } catch (err) {
+    scResult.hidden = true;
+    scError.textContent = err.message;
+    return;
+  }
+
+  scResImpedance.textContent =
+    `Сопротивление трансформатора Zт ≈ ${r.zT.toFixed(4)} Ом, сопротивление кабеля Rкаб ≈ ` +
+    `${r.rCable.toFixed(4)} Ом (на одну жилу).`;
+  scResI3.textContent = `Ток трёхфазного КЗ Iкз(3) ≈ ${formatShortCircuitCurrent(r.i3)} — для проверки отключающей способности автомата.`;
+  scResI1.textContent = `Ток однофазного КЗ «фаза — ноль» Iкз(1) ≈ ${formatShortCircuitCurrent(r.i1)} — для проверки времени автоматического отключения.`;
+
+  // Проверка отключающей способности Icu ≥ Iкз(3).
+  const icuKa = Number(scIcuInput.value);
+  scResIcu.classList.remove('warn');
+  if (icuKa > 0) {
+    const ok = icuKa * 1000 >= r.i3;
+    scResIcu.textContent = ok
+      ? `✓ Отключающая способность Icu = ${icuKa} кА ≥ Iкз(3) (${formatShortCircuitCurrent(r.i3)}) — автомат подходит по Icu.`
+      : `✗ Отключающая способность Icu = ${icuKa} кА меньше Iкз(3) (${formatShortCircuitCurrent(r.i3)}) — нужен автомат с большей Icu.`;
+    scResIcu.classList.toggle('warn', !ok);
+  } else {
+    scResIcu.textContent = '';
+  }
+
+  // Проверка времени отключения по характеристике автомата.
+  const breakerRating = Number(scBreakerInput.value);
+  scResTime.classList.remove('warn');
+  if (breakerRating > 0) {
+    const check = checkDisconnectionByCurve({ singlePhaseCurrent: r.i1, breakerRating, curve: scCurveSelect.value });
+    if (check) {
+      scResTime.textContent = check.ok
+        ? `✓ Iкз(1) (${formatShortCircuitCurrent(r.i1)}) ≥ порога мгновенного расцепления ${Math.round(check.tripThreshold)} А ` +
+          `(${scCurveSelect.value}·${breakerRating}) — отключение заведомо быстрее нормативных 0,4 с / 0,2 с.`
+        : `✗ Iкз(1) (${formatShortCircuitCurrent(r.i1)}) ниже порога мгновенного расцепления ${Math.round(check.tripThreshold)} А ` +
+          `(${scCurveSelect.value}·${breakerRating}) — быстрое отключение не гарантировано: уменьшите длину, увеличьте сечение ` +
+          'или выберите характеристику с меньшей кратностью (C→B) либо примените УЗО.';
+      scResTime.classList.toggle('warn', !check.ok);
+    } else {
+      scResTime.textContent = '';
+    }
+  } else {
+    scResTime.textContent = '';
+  }
+
+  scResult.hidden = false;
+}
+
+scCalcBtn.addEventListener('click', runShortCircuitCalculation);
+
+// --- Поиск по глоссарию -----------------------------------------------------
+const glossarySearchInput = document.getElementById('glossary-search');
+const glossaryItems = Array.from(document.querySelectorAll('#glossary-list .glossary-item'));
+const glossaryEmpty = document.getElementById('glossary-empty');
+
+glossarySearchInput.addEventListener('input', () => {
+  const query = glossarySearchInput.value.trim().toLowerCase();
+  let visibleCount = 0;
+  glossaryItems.forEach((item) => {
+    const match = !query || item.textContent.toLowerCase().includes(query);
+    item.hidden = !match;
+    if (match) visibleCount += 1;
+  });
+  glossaryEmpty.hidden = visibleCount > 0;
 });
 
 renderHistory();
