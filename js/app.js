@@ -552,6 +552,57 @@ function buildConnectorCurrentMark(childId, x, y, amps) {
   return group;
 }
 
+// Тепловая шкала нагрузки: от холодного/бледного (малый ток) к тёплому/яркому
+// (большой ток). Опорные цвета от синего к красному через циан/зелёный/жёлтый.
+const LOAD_COLOR_STOPS = [
+  [96, 165, 250], // #60a5fa — холодный синий (минимальная нагрузка)
+  [34, 211, 238], // #22d3ee — циан
+  [74, 222, 128], // #4ade80 — зелёный
+  [250, 204, 21], // #facc15 — жёлтый
+  [249, 115, 22], // #f97316 — оранжевый
+  [239, 68, 68], //  #ef4444 — тёплый красный (максимальная нагрузка)
+];
+
+/** Цвет [r,g,b] по нормированной нагрузке t∈[0,1] (интерполяция между опорными цветами). */
+function loadColorRgb(t) {
+  const clamped = Math.max(0, Math.min(1, t));
+  const scaled = clamped * (LOAD_COLOR_STOPS.length - 1);
+  const i = Math.min(Math.floor(scaled), LOAD_COLOR_STOPS.length - 2);
+  const f = scaled - i;
+  const a = LOAD_COLOR_STOPS[i];
+  const b = LOAD_COLOR_STOPS[i + 1];
+  return [0, 1, 2].map((k) => Math.round(a[k] + (b[k] - a[k]) * f));
+}
+
+/** Диапазон расчётных токов по всем рассчитанным узлам — основа для нормировки нагрузки. */
+function currentRange() {
+  if (!lastCalcMap) return null;
+  let min = Infinity;
+  let max = -Infinity;
+  for (const calc of lastCalcMap.values()) {
+    if (calc.error || !calc.result) continue;
+    const { I } = calc.result;
+    if (I < min) min = I;
+    if (I > max) max = I;
+  }
+  return min === Infinity ? null : { min, max };
+}
+
+/** Нормирует ток в [0,1] относительно диапазона; при равных значениях — середина шкалы. */
+function normLoad(value, range) {
+  if (!range || range.max <= range.min) return 0.5;
+  return (value - range.min) / (range.max - range.min);
+}
+
+/** Цвет нагрузки узла/линии по его расчётному току (null — если ток не рассчитан). */
+function nodeLoadColor(id, range) {
+  if (!range) return null;
+  const calc = lastCalcMap?.get(id);
+  if (!calc || calc.error || !calc.result) return null;
+  const [r, g, b] = loadColorRgb(normLoad(calc.result.I, range));
+  return { solid: `rgb(${r}, ${g}, ${b})`, r, g, b };
+}
+
 /**
  * При наведении на узел подсвечивает цепочку «узел → ... → корень»: сами
  * блоки и соединяющие их линии остаются полностью видимыми, а всё
@@ -559,24 +610,71 @@ function buildConnectorCurrentMark(childId, x, y, amps) {
  * На линиях этой цепочки также появляются кружки с расчётным током.
  * При наведении на корневой узел (ВРУ) подсвечивается всё дерево целиком —
  * у корня нет предков, поэтому вместо цепочки к корню берётся поддерево.
+ * Цвет линий и контуров узлов отражает нагрузку: чем выше ток на участке,
+ * тем теплее (ярче) цвет; чем ниже — тем холоднее (бледнее).
  */
 function highlightHoverPath(id) {
+  clearHoverInlineStyles();
   const chain = id === networkTree.id ? collectDescendantIds(networkTree) : getAncestorChainIds(id);
+  const range = currentRange();
   networkTreeEl.classList.add('is-hovering');
+
   networkTreeEl.querySelectorAll('.net-node-wrap').forEach((wrap) => {
-    wrap.classList.toggle('on-hover-path', chain.has(wrap.dataset.id));
+    const on = chain.has(wrap.dataset.id);
+    wrap.classList.toggle('on-hover-path', on);
+    const card = wrap.querySelector('.net-node');
+    const color = on ? nodeLoadColor(wrap.dataset.id, range) : null;
+    if (card && color) {
+      card.style.borderColor = color.solid;
+      card.style.boxShadow = `0 0 0 1px ${color.solid}, 0 0 12px rgba(${color.r}, ${color.g}, ${color.b}, 0.4)`;
+    }
   });
+
   networkTreeEl.querySelectorAll('.net-connector').forEach((path) => {
-    path.classList.toggle('on-hover-path', chain.has(path.dataset.child));
+    const on = chain.has(path.dataset.child);
+    path.classList.toggle('on-hover-path', on);
+    const color = on ? nodeLoadColor(path.dataset.child, range) : null;
+    if (color) {
+      path.style.stroke = color.solid;
+      path.style.filter = `drop-shadow(0 0 4px rgba(${color.r}, ${color.g}, ${color.b}, 0.6))`;
+    }
   });
+
   networkTreeEl.querySelectorAll('.net-connector-current').forEach((group) => {
-    group.classList.toggle('on-hover-path', chain.has(group.dataset.child));
+    const on = chain.has(group.dataset.child);
+    group.classList.toggle('on-hover-path', on);
+    const color = on ? nodeLoadColor(group.dataset.child, range) : null;
+    if (color) {
+      const circle = group.querySelector('circle');
+      const text = group.querySelector('text');
+      if (circle) circle.style.stroke = color.solid;
+      if (text) text.style.fill = color.solid;
+    }
+  });
+}
+
+/** Сбрасывает инлайн-цвета тепловой шкалы, возвращая элементы к стилям из CSS. */
+function clearHoverInlineStyles() {
+  networkTreeEl.querySelectorAll('.net-connector').forEach((path) => {
+    path.style.stroke = '';
+    path.style.filter = '';
+  });
+  networkTreeEl.querySelectorAll('.net-node').forEach((card) => {
+    card.style.borderColor = '';
+    card.style.boxShadow = '';
+  });
+  networkTreeEl.querySelectorAll('.net-connector-current circle').forEach((circle) => {
+    circle.style.stroke = '';
+  });
+  networkTreeEl.querySelectorAll('.net-connector-current text').forEach((text) => {
+    text.style.fill = '';
   });
 }
 
 function clearHoverPath() {
   networkTreeEl.classList.remove('is-hovering');
   networkTreeEl.querySelectorAll('.on-hover-path').forEach((el) => el.classList.remove('on-hover-path'));
+  clearHoverInlineStyles();
 }
 
 function updateNodeLoadFieldsUI() {
