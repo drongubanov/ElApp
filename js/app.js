@@ -634,7 +634,7 @@ function highlightHoverPath(id) {
     const color = on ? nodeLoadColor(wrap.dataset.id, range) : null;
     if (card && color) {
       card.style.borderColor = color.solid;
-      card.style.boxShadow = `0 0 0 1px ${color.solid}, 0 0 12px rgba(${color.r}, ${color.g}, ${color.b}, 0.4)`;
+      card.style.boxShadow = `0 0 0 1px ${color.solid}, 0 0 10px 2px rgba(${color.r}, ${color.g}, ${color.b}, 0.55), 0 0 26px 6px rgba(${color.r}, ${color.g}, ${color.b}, 0.3)`;
     }
   });
 
@@ -644,7 +644,7 @@ function highlightHoverPath(id) {
     const color = on ? nodeLoadColor(path.dataset.child, range) : null;
     if (color) {
       path.style.stroke = color.solid;
-      path.style.filter = `drop-shadow(0 0 4px rgba(${color.r}, ${color.g}, ${color.b}, 0.6))`;
+      path.style.filter = `drop-shadow(0 0 3px rgba(${color.r}, ${color.g}, ${color.b}, 0.9)) drop-shadow(0 0 10px rgba(${color.r}, ${color.g}, ${color.b}, 0.55))`;
     }
   });
 
