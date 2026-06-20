@@ -66,6 +66,7 @@ const VOLTAGE_PLACEHOLDERS = {
 
 const tabButtons = document.querySelectorAll('.tab-btn');
 const tabPanels = document.querySelectorAll('.tab-panel');
+const tabNetworkPanel = document.getElementById('tab-network');
 
 const form = document.getElementById('calc-form');
 const networkTypeSelect = document.getElementById('network-type');
@@ -1411,7 +1412,7 @@ networkSearchInput.addEventListener('keydown', (event) => {
   }
 });
 
-undoNetworkBtn.addEventListener('click', () => {
+function performUndo() {
   if (!undoStack.length) return;
   networkTree = undoStack.pop();
   if (!findNode(networkTree, selectedNodeId)) selectedNodeId = networkTree.id;
@@ -1425,19 +1426,39 @@ undoNetworkBtn.addEventListener('click', () => {
   renderPanel();
   renderWarnings();
   renderProjectList();
-});
+}
 
-undoNetworkBtn.addEventListener('click', () => {
-  if (!undoStack.length) return;
-  networkTree = undoStack.pop();
-  if (!findNode(networkTree, selectedNodeId)) selectedNodeId = networkTree.id;
-  lastCalcMap = null;
-  networkErrorMessage.textContent = '';
-  updateUndoButtonUI();
-  persistNetworkScheme();
-  renderTree();
-  renderPanel();
-  renderProjectList();
+undoNetworkBtn.addEventListener('click', performUndo);
+
+// Клавиатурные сокращения на активной вкладке конструктора (и только вне полей
+// ввода, чтобы не мешать редактированию текста): Delete — удалить выбранный
+// узел, Ctrl/Cmd+D — дублировать его, Ctrl/Cmd+Z — отменить последнее действие.
+function isEditableTarget(el) {
+  if (!el) return false;
+  return ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable;
+}
+
+document.addEventListener('keydown', (event) => {
+  if (!tabNetworkPanel.classList.contains('active') || isEditableTarget(event.target) || !networkTree) return;
+
+  const ctrl = event.ctrlKey || event.metaKey;
+  const key = event.key.toLowerCase();
+  const hasSelectedChild = selectedNodeId && selectedNodeId !== networkTree.id;
+
+  if (ctrl && key === 'z' && !event.shiftKey) {
+    if (undoStack.length) {
+      event.preventDefault();
+      performUndo();
+    }
+  } else if (ctrl && key === 'd') {
+    event.preventDefault();
+    if (hasSelectedChild) duplicateNode(selectedNodeId);
+  } else if (event.key === 'Delete') {
+    if (hasSelectedChild) {
+      event.preventDefault();
+      deleteNode(selectedNodeId);
+    }
+  }
 });
 
 function sanitizeFileName(name) {
