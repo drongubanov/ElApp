@@ -489,20 +489,60 @@ function drawConnectors() {
       const cx = cr.left - treeRect.left + cr.width / 2;
       const cy = cr.top - treeRect.top;
       const midY = (py + cy) / 2;
+      const childId = childWrap.dataset.id;
       const path = document.createElementNS(SVG_NS, 'path');
       path.setAttribute('class', 'net-connector');
       path.setAttribute('d', `M ${px} ${py} C ${px} ${midY}, ${cx} ${midY}, ${cx} ${cy}`);
       path.dataset.parent = wrap.dataset.id;
-      path.dataset.child = childWrap.dataset.id;
+      path.dataset.child = childId;
       svg.appendChild(path);
+
+      const calc = lastCalcMap?.get(childId);
+      if (calc && !calc.error) {
+        const midX = (px + cx) / 2;
+        svg.appendChild(buildConnectorCurrentMark(childId, midX, midY, calc.result.I));
+      }
     });
   });
+}
+
+// Компактное представление тока для надписи внутри кружка на линии —
+// без единицы измерения (не помещается рядом с числом в круге малого
+// радиуса), точность снижается для больших значений, чтобы текст влезал.
+function formatConnectorCurrent(amps) {
+  const decimals = amps < 10 ? 2 : amps < 100 ? 1 : 0;
+  return amps.toLocaleString('ru-RU', { maximumFractionDigits: decimals });
+}
+
+function buildConnectorCurrentMark(childId, x, y, amps) {
+  const group = document.createElementNS(SVG_NS, 'g');
+  group.setAttribute('class', 'net-connector-current');
+  group.dataset.child = childId;
+
+  const circle = document.createElementNS(SVG_NS, 'circle');
+  circle.setAttribute('cx', String(x));
+  circle.setAttribute('cy', String(y));
+  circle.setAttribute('r', '15');
+
+  const text = document.createElementNS(SVG_NS, 'text');
+  text.setAttribute('x', String(x));
+  text.setAttribute('y', String(y));
+  text.setAttribute('text-anchor', 'middle');
+  text.setAttribute('dominant-baseline', 'central');
+  text.textContent = formatConnectorCurrent(amps);
+
+  const title = document.createElementNS(SVG_NS, 'title');
+  title.textContent = `Расчётный ток линии: ${formatCurrent(amps)}`;
+
+  group.append(circle, text, title);
+  return group;
 }
 
 /**
  * При наведении на узел подсвечивает цепочку «узел → ... → корень»: сами
  * блоки и соединяющие их линии остаются полностью видимыми, а всё
  * остальное дерево затухает (см. .is-hovering / .on-hover-path в CSS).
+ * На линиях этой цепочки также появляются кружки с расчётным током.
  */
 function highlightHoverPath(id) {
   const chain = getAncestorChainIds(id);
@@ -512,6 +552,9 @@ function highlightHoverPath(id) {
   });
   networkTreeEl.querySelectorAll('.net-connector').forEach((path) => {
     path.classList.toggle('on-hover-path', chain.has(path.dataset.child));
+  });
+  networkTreeEl.querySelectorAll('.net-connector-current').forEach((group) => {
+    group.classList.toggle('on-hover-path', chain.has(group.dataset.child));
   });
 }
 
