@@ -235,6 +235,35 @@
         <p id="network-project-status" class="note-line"></p>
       </fieldset>
 
+      <fieldset class="field-group net-versions">
+        <legend>Версии и сравнение</legend>
+        <p class="note">
+          Сохраняйте снимки (версии) текущей схемы и сравнивайте любой из них с текущей схемой —
+          конструктор покажет, что изменилось в мощности, токе и номиналах автоматов по каждому узлу,
+          а также какие узлы добавлены или удалены.
+        </p>
+
+        <div class="net-projects-row">
+          <button type="button" id="save-version-btn" class="btn-secondary">Сохранить версию…</button>
+        </div>
+
+        <div class="net-projects-row">
+          <div class="field">
+            <label for="network-version-select">Сохранённые версии</label>
+            <select id="network-version-select">
+              <option value="">— нет сохранённых версий —</option>
+            </select>
+          </div>
+          <button type="button" id="compare-version-btn" class="btn-secondary" disabled>Сравнить с текущей</button>
+          <button type="button" id="delete-version-btn" class="btn-secondary" disabled>Удалить</button>
+        </div>
+
+        <div class="net-diff" id="network-diff" hidden>
+          <h4 class="net-diff-title" id="network-diff-title"></h4>
+          <ul class="net-diff-list" id="network-diff-list"></ul>
+        </div>
+      </fieldset>
+
       <div class="net-actions">
         <button type="button" id="calc-network-btn" class="btn-primary">Рассчитать сеть</button>
         <button type="button" id="undo-network-btn" class="btn-secondary" title="Отменить последнее действие" disabled>
