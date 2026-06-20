@@ -263,6 +263,13 @@ function getAncestorChainIds(id) {
   return ids;
 }
 
+/** ID узла и всех его потомков на любую глубину — для подсветки всего дерева при наведении на корень. */
+function collectDescendantIds(node, ids = new Set()) {
+  ids.add(node.id);
+  node.children.forEach((child) => collectDescendantIds(child, ids));
+  return ids;
+}
+
 function persistNetworkScheme() {
   if (networkTree) saveNetworkScheme({ tree: networkTree });
 }
@@ -543,9 +550,11 @@ function buildConnectorCurrentMark(childId, x, y, amps) {
  * блоки и соединяющие их линии остаются полностью видимыми, а всё
  * остальное дерево затухает (см. .is-hovering / .on-hover-path в CSS).
  * На линиях этой цепочки также появляются кружки с расчётным током.
+ * При наведении на корневой узел (ВРУ) подсвечивается всё дерево целиком —
+ * у корня нет предков, поэтому вместо цепочки к корню берётся поддерево.
  */
 function highlightHoverPath(id) {
-  const chain = getAncestorChainIds(id);
+  const chain = id === networkTree.id ? collectDescendantIds(networkTree) : getAncestorChainIds(id);
   networkTreeEl.classList.add('is-hovering');
   networkTreeEl.querySelectorAll('.net-node-wrap').forEach((wrap) => {
     wrap.classList.toggle('on-hover-path', chain.has(wrap.dataset.id));
