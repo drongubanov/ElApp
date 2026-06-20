@@ -154,6 +154,7 @@ const multiDeleteBtn = document.getElementById('multi-delete-btn');
 const multiClearBtn = document.getElementById('multi-clear-btn');
 const networkPanel = document.getElementById('network-panel');
 const netPanelTitle = document.getElementById('net-panel-title');
+const netBreadcrumb = document.getElementById('net-breadcrumb');
 
 const nodeNameInput = document.getElementById('node-name');
 const nodeHasOwnLoadInput = document.getElementById('node-has-own-load');
@@ -414,6 +415,37 @@ function expandAncestors(nodeId) {
     parent = findParentNode(networkTree, parent.id);
   }
   return changed;
+}
+
+/** Хлебные крошки «корень → ... → текущий узел» в заголовке панели параметров — показывают глубину/положение узла в дереве; клик по предку выделяет и прокручивает к нему. */
+function renderBreadcrumb(node) {
+  netBreadcrumb.innerHTML = '';
+  const chainIds = Array.from(getAncestorChainIds(node.id)).reverse();
+  chainIds.forEach((id, index) => {
+    const ancestor = findNode(networkTree, id);
+    if (!ancestor) return;
+    if (index > 0) {
+      const sep = document.createElement('span');
+      sep.className = 'net-breadcrumb-sep';
+      sep.textContent = '›';
+      sep.setAttribute('aria-hidden', 'true');
+      netBreadcrumb.appendChild(sep);
+    }
+    if (index === chainIds.length - 1) {
+      const current = document.createElement('span');
+      current.className = 'net-breadcrumb-current';
+      current.textContent = ancestor.name;
+      current.setAttribute('aria-current', 'true');
+      netBreadcrumb.appendChild(current);
+    } else {
+      const link = document.createElement('button');
+      link.type = 'button';
+      link.className = 'net-breadcrumb-link';
+      link.textContent = ancestor.name;
+      link.addEventListener('click', () => revealNode(ancestor.id));
+      netBreadcrumb.appendChild(link);
+    }
+  });
 }
 
 /** Выбирает узел и прокручивает его карточку в зону видимости, разворачивая свёрнутые ветви на пути к нему. */
@@ -1538,6 +1570,7 @@ function renderPanel() {
   }
   networkPanel.hidden = false;
   netPanelTitle.textContent = node.name;
+  renderBreadcrumb(node);
   nodeNameInput.value = node.name;
   nodeHasOwnLoadInput.checked = node.hasOwnLoad;
   nodeNetworkTypeSelect.value = node.networkType;
@@ -1606,6 +1639,7 @@ function onPanelChange() {
   }
 
   netPanelTitle.textContent = node.name;
+  renderBreadcrumb(node);
   updateNodeLoadFieldsUI();
   updateNodeKnownFieldsUI();
   updateNodeLoadTypeUI();

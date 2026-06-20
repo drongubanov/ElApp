@@ -1073,8 +1073,44 @@ input:focus {
 }
 
 .net-panel-header h3 {
-  margin: 0 0 16px;
+  margin: 0 0 8px;
   font-size: 1.05rem;
+}
+
+.net-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 16px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.net-breadcrumb-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+}
+
+.net-breadcrumb-link:hover {
+  color: var(--color-accent);
+  text-decoration-color: currentColor;
+}
+
+.net-breadcrumb-current {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.net-breadcrumb-sep {
+  color: var(--color-text-muted);
 }
 
 .net-checkbox {
