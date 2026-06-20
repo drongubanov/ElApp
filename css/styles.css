@@ -1049,6 +1049,10 @@ input:focus {
   color: var(--color-danger);
 }
 
+.net-node-badge.caution {
+  color: var(--color-accent);
+}
+
 .net-panel {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
