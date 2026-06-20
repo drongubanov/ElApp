@@ -237,20 +237,40 @@
         <button type="button" id="undo-network-btn" class="btn-secondary" title="Отменить последнее действие" disabled>
           ↶ Отменить
         </button>
-        <button type="button" id="export-pdf-btn" class="btn-secondary btn-export" title="Сохранить однолинейную схему в PDF">
-          ↧ Схема PDF
-        </button>
-        <button type="button" id="export-dxf-btn" class="btn-secondary btn-export" title="Сохранить однолинейную схему в DXF (открывается в AutoCAD и др. CAD)">
-          ↧ Схема DXF
-        </button>
-        <button type="button" id="export-spec-btn" class="btn-secondary btn-export" title="Сохранить сводную ведомость линий сети в CSV (Excel)">
-          ↧ Ведомость CSV
-        </button>
+        <div class="net-export-menu">
+          <button type="button" id="export-menu-btn" class="btn-secondary btn-export"
+            aria-haspopup="true" aria-expanded="false" aria-controls="export-dropdown"
+            title="Сохранить схему или ведомость в файл">
+            ↧ Экспорт ▾
+          </button>
+          <div class="net-export-dropdown" id="export-dropdown" role="menu" hidden>
+            <button type="button" id="export-pdf-btn" role="menuitem" title="Сохранить однолинейную схему в PDF">
+              Схема в PDF
+            </button>
+            <button type="button" id="export-dxf-btn" role="menuitem" title="Сохранить однолинейную схему в DXF (открывается в AutoCAD и др. CAD)">
+              Схема в DXF (CAD)
+            </button>
+            <button type="button" id="export-spec-btn" role="menuitem" title="Сохранить сводную ведомость линий сети в CSV (Excel)">
+              Ведомость в CSV (Excel)
+            </button>
+          </div>
+        </div>
         <button type="button" id="reset-network-btn" class="btn-secondary" title="Удалить все узлы и параметры и начать сначала">
           ⟲ Сбросить сеть
         </button>
       </div>
       <p class="error-message" id="network-error-message" role="alert"></p>
+
+      <section class="net-warnings" id="network-warnings" hidden aria-live="polite">
+        <h3 class="net-warnings-title">Сводка проверок <span class="net-warnings-count" id="net-warnings-count"></span></h3>
+        <ul class="net-warnings-list" id="net-warnings-list"></ul>
+      </section>
+
+      <div class="net-search">
+        <input type="search" id="network-search" class="net-search-input"
+          placeholder="Поиск узла по названию…" aria-label="Поиск узла по названию" autocomplete="off" />
+        <span id="network-search-status" class="note-line" role="status" aria-live="polite"></span>
+      </div>
 
       <div class="net-tree-wrapper">
         <ul class="net-tree" id="network-tree"></ul>
