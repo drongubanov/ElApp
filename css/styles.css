@@ -94,18 +94,6 @@ main {
   max-width: 360px;
 }
 
-/* Вкладка сети выходит за ограничение ширины main (1280px) и занимает всю
-   ширину экрана — дереву узлов нужно больше места, чем другим вкладкам. */
-#tab-network {
-  width: 100vw;
-  max-width: 100vw;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
-  padding-left: 16px;
-  padding-right: 16px;
-  box-sizing: border-box;
-}
-
 #node-load-fields,
 .net-panel .field-group {
   display: flex;
@@ -420,10 +408,18 @@ input:focus {
   margin-bottom: 10px;
 }
 
+/* Только поле с деревом узлов выходит за ограничение ширины main (1280px)
+   и занимает всю ширину экрана — узлам нужно больше горизонтального места.
+   Остальные блоки вкладки (описание, кнопки, панель свойств) не затронуты. */
 .net-tree-wrapper {
   overflow-x: auto;
-  padding: 4px 0 28px;
+  padding: 4px 16px 28px;
   margin-bottom: 18px;
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  box-sizing: border-box;
 }
 
 .net-tree,
