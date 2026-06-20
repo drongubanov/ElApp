@@ -404,6 +404,27 @@ input:focus {
   font-size: 0.85rem;
 }
 
+.net-projects-row {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.net-projects-row:last-of-type {
+  margin-bottom: 0;
+}
+
+.net-projects-row .field {
+  flex: 1 1 220px;
+  margin-bottom: 0;
+}
+
+.net-projects-row > .btn-secondary {
+  flex: 0 0 auto;
+}
+
 .net-actions {
   display: flex;
   align-items: stretch;

@@ -8,6 +8,7 @@ import {
 } from './tables.js';
 import { calculateTree, DEFAULT_START_CURRENT_RATIO } from './network.js';
 import { loadNetworkScheme, saveNetworkScheme } from './networkStorage.js';
+import { loadProjects, getProject, saveProject, deleteProject } from './networkProjects.js';
 import { buildSchemeLayout } from './schemeLayout.js';
 import { buildSheet } from './schemeSheet.js';
 import { buildSchemePdf } from './exportPdf.js';
@@ -92,6 +93,12 @@ const calcNetworkBtn = document.getElementById('calc-network-btn');
 const exportPdfBtn = document.getElementById('export-pdf-btn');
 const exportDxfBtn = document.getElementById('export-dxf-btn');
 const resetNetworkBtn = document.getElementById('reset-network-btn');
+const networkProjectSelect = document.getElementById('network-project-select');
+const openProjectBtn = document.getElementById('open-project-btn');
+const saveProjectAsBtn = document.getElementById('save-project-as-btn');
+const saveProjectBtn = document.getElementById('save-project-btn');
+const deleteProjectBtn = document.getElementById('delete-project-btn');
+const networkProjectStatus = document.getElementById('network-project-status');
 const networkErrorMessage = document.getElementById('network-error-message');
 const networkPanel = document.getElementById('network-panel');
 const netPanelTitle = document.getElementById('net-panel-title');
@@ -262,6 +269,7 @@ function buildDefaultTree() {
 let networkTree = null;
 let selectedNodeId = null;
 let lastCalcMap = null;
+let activeProjectId = null;
 
 function findNode(node, id) {
   if (node.id === id) return node;
@@ -310,7 +318,38 @@ function collectDescendantIds(node, ids = new Set()) {
 }
 
 function persistNetworkScheme() {
-  if (networkTree) saveNetworkScheme({ tree: networkTree });
+  if (networkTree) saveNetworkScheme({ tree: networkTree, activeProjectId });
+}
+
+function renderProjectList() {
+  const projects = loadProjects();
+  const previousValue = networkProjectSelect.value;
+  networkProjectSelect.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = projects.length ? '— выберите проект —' : '— нет сохранённых проектов —';
+  networkProjectSelect.appendChild(placeholder);
+  projects.forEach((project) => {
+    const option = document.createElement('option');
+    option.value = project.id;
+    option.textContent = `${project.name} — ${formatDateTime(project.updatedAt)}`;
+    networkProjectSelect.appendChild(option);
+  });
+  const toSelect = activeProjectId ?? previousValue;
+  if (projects.some((project) => project.id === toSelect)) networkProjectSelect.value = toSelect;
+  updateProjectControlsUI(projects);
+}
+
+function updateProjectControlsUI(projects = loadProjects()) {
+  if (activeProjectId && !projects.some((project) => project.id === activeProjectId)) activeProjectId = null;
+  const selectedId = networkProjectSelect.value;
+  openProjectBtn.disabled = !selectedId;
+  deleteProjectBtn.disabled = !selectedId;
+  const activeProject = activeProjectId ? projects.find((project) => project.id === activeProjectId) : null;
+  saveProjectBtn.hidden = !activeProject;
+  networkProjectStatus.textContent = activeProject
+    ? `Текущая схема — проект «${activeProject.name}», сохранён ${formatDateTime(activeProject.updatedAt)}.`
+    : 'Текущая схема не сохранена как проект — нажмите «Сохранить как новый проект…», чтобы не потерять её.';
 }
 
 function nodeTag(node) {
@@ -968,19 +1007,70 @@ resetNetworkBtn.addEventListener('click', () => {
   if (!confirm('Удалить все узлы и параметры сети и начать сначала?')) return;
   networkTree = buildDefaultTree();
   selectedNodeId = networkTree.id;
+  activeProjectId = null;
   lastCalcMap = null;
   networkErrorMessage.textContent = '';
   persistNetworkScheme();
   renderTree();
   renderPanel();
+  renderProjectList();
+});
+
+networkProjectSelect.addEventListener('change', () => updateProjectControlsUI());
+
+openProjectBtn.addEventListener('click', () => {
+  const project = networkProjectSelect.value ? getProject(networkProjectSelect.value) : null;
+  if (!project) return;
+  if (!confirm(`Открыть проект «${project.name}»? Текущая схема будет заменена схемой проекта.`)) return;
+  networkTree = project.tree;
+  selectedNodeId = networkTree.id;
+  activeProjectId = project.id;
+  lastCalcMap = null;
+  networkErrorMessage.textContent = '';
+  persistNetworkScheme();
+  renderTree();
+  renderPanel();
+  renderProjectList();
+});
+
+saveProjectAsBtn.addEventListener('click', () => {
+  if (!networkTree) return;
+  const name = prompt('Название проекта:', networkTree.name || 'Новый проект');
+  if (name === null) return;
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  const project = saveProject({ name: trimmed, tree: networkTree });
+  activeProjectId = project.id;
+  persistNetworkScheme();
+  renderProjectList();
+});
+
+saveProjectBtn.addEventListener('click', () => {
+  if (!activeProjectId) return;
+  const existing = getProject(activeProjectId);
+  if (!existing) return;
+  saveProject({ id: activeProjectId, name: existing.name, tree: networkTree });
+  renderProjectList();
+});
+
+deleteProjectBtn.addEventListener('click', () => {
+  const project = networkProjectSelect.value ? getProject(networkProjectSelect.value) : null;
+  if (!project) return;
+  if (!confirm(`Удалить проект «${project.name}»? Это действие нельзя отменить.`)) return;
+  deleteProject(project.id);
+  if (activeProjectId === project.id) activeProjectId = null;
+  persistNetworkScheme();
+  renderProjectList();
 });
 
 const savedNetworkScheme = loadNetworkScheme();
 networkTree = savedNetworkScheme ? savedNetworkScheme.tree : buildDefaultTree();
 selectedNodeId = networkTree.id;
+activeProjectId = savedNetworkScheme?.activeProjectId ?? null;
 if (!savedNetworkScheme) persistNetworkScheme();
 renderTree();
 renderPanel();
+renderProjectList();
 
 function showError(message) {
   errorMessage.textContent = message;

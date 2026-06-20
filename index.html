@@ -181,6 +181,32 @@
         Кнопка «Рассчитать сеть» подбирает автоматы и кабели для всех линий дерева.
       </p>
 
+      <fieldset class="field-group net-projects">
+        <legend>Проекты сети</legend>
+        <p class="note">
+          Сохраняйте текущую схему как именованный проект, чтобы вернуться к ней позже. Сохранённые
+          проекты хранятся в этом браузере и не пропадают при сбросе схемы или создании новой.
+        </p>
+
+        <div class="net-projects-row">
+          <div class="field">
+            <label for="network-project-select">Сохранённые проекты</label>
+            <select id="network-project-select">
+              <option value="">— нет сохранённых проектов —</option>
+            </select>
+          </div>
+          <button type="button" id="open-project-btn" class="btn-secondary" disabled>Открыть</button>
+          <button type="button" id="delete-project-btn" class="btn-secondary" disabled>Удалить</button>
+        </div>
+
+        <div class="net-projects-row">
+          <button type="button" id="save-project-as-btn" class="btn-secondary">Сохранить как новый проект…</button>
+          <button type="button" id="save-project-btn" class="btn-secondary" hidden>Сохранить изменения в проект</button>
+        </div>
+
+        <p id="network-project-status" class="note-line"></p>
+      </fieldset>
+
       <div class="net-actions">
         <button type="button" id="calc-network-btn" class="btn-primary">Рассчитать сеть</button>
         <button type="button" id="export-pdf-btn" class="btn-secondary btn-export" title="Сохранить однолинейную схему в PDF">
