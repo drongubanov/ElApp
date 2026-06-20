@@ -17,6 +17,7 @@ import { buildSchemePdf } from './exportPdf.js';
 import { buildDxf } from './exportDxf.js';
 import { buildSpecCsv } from './schemeSpec.js';
 import { collectSchemeWarnings, VOLTAGE_DROP_LIMIT_PERCENT } from './schemeWarnings.js';
+import { NODE_TEMPLATES } from './nodeTemplates.js';
 import { loadHistory, saveHistoryEntry, deleteHistoryEntry, clearHistory } from './history.js';
 import { formatPower, formatApparentPower, formatReactivePower, formatCurrent, formatDateTime } from './format.js';
 
@@ -131,6 +132,7 @@ const netWarningsCount = document.getElementById('net-warnings-count');
 const netWarningsList = document.getElementById('net-warnings-list');
 const networkSearchInput = document.getElementById('network-search');
 const networkSearchStatus = document.getElementById('network-search-status');
+const nodeAddMenu = document.getElementById('node-add-menu');
 const networkPanel = document.getElementById('network-panel');
 const netPanelTitle = document.getElementById('net-panel-title');
 
@@ -315,6 +317,8 @@ let draggedNodeId = null;
 let searchQuery = '';
 let searchMatchIds = new Set();
 let searchPathIds = new Set();
+let addMenuParentId = null;
+let addMenuAnchor = null;
 
 const UNDO_LIMIT = 20;
 let undoStack = [];
@@ -516,16 +520,91 @@ function collectErrors(calcNode, acc = []) {
   return acc;
 }
 
-function addChildToNode(parentId) {
+function addChildToNode(parentId, overrides = {}) {
   const parent = findNode(networkTree, parentId);
   if (!parent) return;
-  const child = createNode();
+  const child = createNode(overrides);
   parent.children.push(child);
   selectedNodeId = child.id;
   persistNetworkScheme();
   renderTree();
   renderPanel();
 }
+
+// --- Меню добавления узла (пустой узел + шаблоны типовых узлов) -------------
+// Одно общее всплывающее меню на всё дерево: при клике по «+» позиционируется
+// у нажатой кнопки. Пункты строятся один раз из NODE_TEMPLATES.
+function buildAddMenu() {
+  const items = [
+    { id: 'blank', label: 'Пустой узел', hint: 'Параметры по умолчанию', node: {} },
+    ...NODE_TEMPLATES,
+  ];
+  items.forEach((item) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute('role', 'menuitem');
+    const label = document.createElement('span');
+    label.className = 'net-add-menu-label';
+    label.textContent = item.label;
+    const hint = document.createElement('span');
+    hint.className = 'net-add-menu-hint';
+    hint.textContent = item.hint;
+    button.append(label, hint);
+    button.addEventListener('click', () => {
+      const parentId = addMenuParentId;
+      closeAddMenu();
+      if (parentId) addChildToNode(parentId, { ...item.node });
+    });
+    nodeAddMenu.appendChild(button);
+  });
+}
+
+// Меню позиционируется фиксированно у кнопки «+». Чтобы оно не «отрывалось»
+// при прокрутке (а клик по «+» сам по себе подкручивает кнопку в зону
+// видимости), меню не закрывается на скролл, а пересчитывает позицию у якоря.
+function positionAddMenu() {
+  if (!addMenuAnchor) return;
+  const anchorRect = addMenuAnchor.getBoundingClientRect();
+  const menuRect = nodeAddMenu.getBoundingClientRect();
+  let left = anchorRect.left;
+  let top = anchorRect.bottom + 4;
+  if (left + menuRect.width > window.innerWidth - 8) left = window.innerWidth - menuRect.width - 8;
+  if (top + menuRect.height > window.innerHeight - 8) top = anchorRect.top - menuRect.height - 4;
+  nodeAddMenu.style.left = `${Math.max(8, left)}px`;
+  nodeAddMenu.style.top = `${Math.max(8, top)}px`;
+}
+
+function openAddMenu(parentId, anchor) {
+  addMenuParentId = parentId;
+  addMenuAnchor = anchor;
+  nodeAddMenu.hidden = false;
+  positionAddMenu();
+}
+
+function closeAddMenu() {
+  nodeAddMenu.hidden = true;
+  addMenuParentId = null;
+  addMenuAnchor = null;
+}
+
+buildAddMenu();
+
+document.addEventListener('click', (event) => {
+  if (!nodeAddMenu.hidden && !event.target.closest('#node-add-menu') && !event.target.closest('.net-node-add-btn')) {
+    closeAddMenu();
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !nodeAddMenu.hidden) closeAddMenu();
+});
+
+window.addEventListener('scroll', () => {
+  if (!nodeAddMenu.hidden) positionAddMenu();
+}, true);
+window.addEventListener('resize', () => {
+  if (!nodeAddMenu.hidden) positionAddMenu();
+});
 
 function deleteNode(id) {
   if (id === networkTree.id) return;
@@ -697,12 +776,13 @@ function renderNodeEl(node) {
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
   addBtn.className = 'net-node-icon-btn net-node-add-btn';
-  addBtn.title = 'Добавить дочерний узел';
+  addBtn.title = 'Добавить дочерний узел (пустой или по шаблону)';
   addBtn.setAttribute('aria-label', 'Добавить дочерний узел');
+  addBtn.setAttribute('aria-haspopup', 'true');
   addBtn.textContent = '+';
   addBtn.addEventListener('click', (event) => {
     event.stopPropagation();
-    addChildToNode(node.id);
+    openAddMenu(node.id, addBtn);
   });
   toolbar.appendChild(addBtn);
 

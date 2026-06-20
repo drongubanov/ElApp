@@ -633,6 +633,61 @@ input:focus {
   box-shadow: 0 0 0 2px var(--color-accent);
 }
 
+/* --- Меню добавления узла (пустой узел + шаблоны) -------------------------- */
+.net-add-menu {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.net-add-menu[hidden] {
+  display: none;
+}
+
+.net-add-menu > button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.net-add-menu > button:last-child {
+  border-bottom: none;
+}
+
+.net-add-menu > button:hover,
+.net-add-menu > button:focus-visible {
+  background: var(--color-surface-alt);
+  outline: none;
+}
+
+.net-add-menu > button:hover .net-add-menu-label,
+.net-add-menu > button:focus-visible .net-add-menu-label {
+  color: var(--color-accent);
+}
+
+.net-add-menu-label {
+  font-weight: 600;
+}
+
+.net-add-menu-hint {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
 /* Только поле с деревом узлов выходит за ограничение ширины #tab-network (640px)
    и занимает всю ширину экрана — узлам нужно больше горизонтального места.
    Остальные блоки вкладки (заголовок, описание, кнопки, панель свойств) сужены
