@@ -1,18 +1,21 @@
 import { calculate, calculateVoltageDrop, NETWORK_TYPES } from './calculations.js';
 import {
   recommendProtection,
+  recommendPeSection,
   INSTALLATION_LABELS,
   CABLE_TABLE,
   CABLE_TABLE_SOURCE,
   SELECTIVITY_SAFE_RATIO,
 } from './tables.js';
-import { calculateTree, DEFAULT_START_CURRENT_RATIO } from './network.js';
+import { calculateShortCircuit, checkDisconnectionByCurve } from './shortCircuit.js';
+import { calculateTree, annotateShortCircuit, DEFAULT_START_CURRENT_RATIO } from './network.js';
 import { loadNetworkScheme, saveNetworkScheme } from './networkStorage.js';
 import { loadProjects, getProject, saveProject, deleteProject } from './networkProjects.js';
 import { buildSchemeLayout } from './schemeLayout.js';
 import { buildSheet } from './schemeSheet.js';
 import { buildSchemePdf } from './exportPdf.js';
 import { buildDxf } from './exportDxf.js';
+import { buildSpecCsv } from './schemeSpec.js';
 import { loadHistory, saveHistoryEntry, deleteHistoryEntry, clearHistory } from './history.js';
 import { formatPower, formatApparentPower, formatReactivePower, formatCurrent, formatDateTime } from './format.js';
 
@@ -29,6 +32,22 @@ const NETWORK_SHORT_LABELS = {
   [NETWORK_TYPES.AC1]: '1~',
   [NETWORK_TYPES.AC3]: '3~',
 };
+
+/**
+ * Текст рекомендации по сечению PE/PEN-проводника для рассчитанной защиты:
+ * по правилу ПУЭ-7 (табл. 1.7.5) от сечения фазного проводника. Для меди и
+ * алюминия фазные сечения различаются, поэтому показываем оба, если оба
+ * подобраны. Пустая строка — если ни одно сечение не подобрано.
+ */
+function buildPeSectionText(protection) {
+  const parts = [];
+  const copperSection = protection.copperCable?.section;
+  const aluminumSection = protection.aluminumCable?.section;
+  if (copperSection != null) parts.push(`медь ${copperSection} мм² → не менее ${recommendPeSection(copperSection)} мм²`);
+  if (aluminumSection != null) parts.push(`алюминий ${aluminumSection} мм² → не менее ${recommendPeSection(aluminumSection)} мм²`);
+  if (!parts.length) return '';
+  return `Минимальное сечение PE/PEN-проводника (по ПУЭ-7, табл. 1.7.5): ${parts.join('; ')}.`;
+}
 
 function pluralize(n, one, few, many) {
   const mod10 = n % 10;
@@ -77,6 +96,7 @@ const resI = document.getElementById('res-i');
 const resLoadDiagram = document.getElementById('res-load-diagram');
 const resBreaker = document.getElementById('res-breaker');
 const resCable = document.getElementById('res-cable');
+const resPeSection = document.getElementById('res-pe-section');
 const resCorrection = document.getElementById('res-correction');
 const resVoltageDrop = document.getElementById('res-voltage-drop');
 const resPueCheck = document.getElementById('res-pue-check');
@@ -90,14 +110,19 @@ const clearHistoryBtn = document.getElementById('clear-history-btn');
 
 const networkTreeEl = document.getElementById('network-tree');
 const calcNetworkBtn = document.getElementById('calc-network-btn');
+const undoNetworkBtn = document.getElementById('undo-network-btn');
 const exportPdfBtn = document.getElementById('export-pdf-btn');
 const exportDxfBtn = document.getElementById('export-dxf-btn');
+const exportSpecBtn = document.getElementById('export-spec-btn');
 const resetNetworkBtn = document.getElementById('reset-network-btn');
 const networkProjectSelect = document.getElementById('network-project-select');
 const openProjectBtn = document.getElementById('open-project-btn');
 const saveProjectAsBtn = document.getElementById('save-project-as-btn');
 const saveProjectBtn = document.getElementById('save-project-btn');
 const deleteProjectBtn = document.getElementById('delete-project-btn');
+const exportProjectBtn = document.getElementById('export-project-btn');
+const importProjectBtn = document.getElementById('import-project-btn');
+const importProjectInput = document.getElementById('import-project-input');
 const networkProjectStatus = document.getElementById('network-project-status');
 const networkErrorMessage = document.getElementById('network-error-message');
 const networkPanel = document.getElementById('network-panel');
@@ -120,6 +145,9 @@ const nodeUtilizationInput = document.getElementById('node-utilization-factor');
 const nodeLoadTypeSelect = document.getElementById('node-load-type');
 const nodeStartRatioField = document.getElementById('node-start-ratio-field');
 const nodeStartRatioInput = document.getElementById('node-start-ratio');
+const nodeTransformerField = document.getElementById('node-transformer-field');
+const nodeTransformerPowerInput = document.getElementById('node-transformer-power');
+const nodeTransformerUkInput = document.getElementById('node-transformer-uk');
 const nodeCableLegend = document.getElementById('node-cable-legend');
 const nodeInstallationSelect = document.getElementById('node-installation');
 const nodeCableCountInput = document.getElementById('node-cable-count');
@@ -136,8 +164,11 @@ const nodeResI = document.getElementById('node-res-i');
 const nodeResLoadDiagram = document.getElementById('node-res-load-diagram');
 const nodeResBreaker = document.getElementById('node-res-breaker');
 const nodeResCable = document.getElementById('node-res-cable');
+const nodeResPeSection = document.getElementById('node-res-pe-section');
 const nodeResVoltageDrop = document.getElementById('node-res-voltage-drop');
 const nodeResSelectivity = document.getElementById('node-res-selectivity');
+const nodeResBalance = document.getElementById('node-res-balance');
+const nodeResShortCircuit = document.getElementById('node-res-shortcircuit');
 
 function switchTab(tabName) {
   tabButtons.forEach((btn) => {
@@ -232,6 +263,9 @@ function createNode(overrides = {}) {
     utilizationFactor: 1,
     loadType: 'general',
     startCurrentRatio: DEFAULT_START_CURRENT_RATIO,
+    transformerPowerKva: null,
+    transformerUkPercent: null,
+    collapsed: false,
     children: [],
     ...overrides,
   };
@@ -270,6 +304,22 @@ let networkTree = null;
 let selectedNodeId = null;
 let lastCalcMap = null;
 let activeProjectId = null;
+let draggedNodeId = null;
+
+const UNDO_LIMIT = 20;
+let undoStack = [];
+
+/** Сохраняет снимок дерева в стек отмены — вызывается перед деструктивными операциями (удаление, перенос, замена). */
+function pushUndo() {
+  if (!networkTree) return;
+  undoStack.push(structuredClone(networkTree));
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  updateUndoButtonUI();
+}
+
+function updateUndoButtonUI() {
+  undoNetworkBtn.disabled = undoStack.length === 0;
+}
 
 function findNode(node, id) {
   if (node.id === id) return node;
@@ -363,7 +413,8 @@ function nodeTag(node) {
 function nodeMeta(node) {
   if (node.hasOwnLoad) return `${NETWORK_SHORT_LABELS[node.networkType] ?? ''} ${node.voltage} В`;
   if (node.children.length) {
-    return `${node.children.length} ${pluralize(node.children.length, 'дочерний узел', 'дочерних узла', 'дочерних узлов')}`;
+    const word = pluralize(node.children.length, 'дочерний узел', 'дочерних узла', 'дочерних узлов');
+    return node.collapsed ? `${node.children.length} ${word} (свёрнуто)` : `${node.children.length} ${word}`;
   }
   return '';
 }
@@ -403,10 +454,52 @@ function deleteNode(id) {
     const word = pluralize(descendants, 'дочерний узел', 'дочерних узла', 'дочерних узлов');
     if (!confirm(`Удалить узел «${node.name}» и ${descendants} ${word}?`)) return;
   }
+  pushUndo();
   parent.children = parent.children.filter((child) => child.id !== node.id);
   if (isDescendantOrSelf(node, selectedNodeId)) {
     selectedNodeId = parent.id;
   }
+  persistNetworkScheme();
+  renderTree();
+  renderPanel();
+}
+
+function cloneNodeDeepInner(node) {
+  return {
+    ...node,
+    id: crypto.randomUUID(),
+    children: node.children.map((child) => cloneNodeDeepInner(child)),
+  };
+}
+
+/** Дублирует узел вместе со всем поддеревом, вставляя копию следующим соседом сразу после оригинала. */
+function duplicateNode(id) {
+  if (id === networkTree.id) return;
+  const node = findNode(networkTree, id);
+  const parent = findParentNode(networkTree, id);
+  if (!node || !parent) return;
+  pushUndo();
+  const clone = cloneNodeDeepInner(node);
+  clone.name = `${node.name} (копия)`;
+  const index = parent.children.findIndex((child) => child.id === node.id);
+  parent.children.splice(index + 1, 0, clone);
+  selectedNodeId = clone.id;
+  persistNetworkScheme();
+  renderTree();
+  renderPanel();
+}
+
+/** Переносит узел (вместе с поддеревом) под другого родителя — основа drag-and-drop в дереве. */
+function moveNode(nodeId, newParentId) {
+  if (nodeId === newParentId || nodeId === networkTree.id) return;
+  const node = findNode(networkTree, nodeId);
+  const newParent = findNode(networkTree, newParentId);
+  const oldParent = findParentNode(networkTree, nodeId);
+  if (!node || !newParent || !oldParent || oldParent.id === newParent.id) return;
+  if (isDescendantOrSelf(node, newParentId)) return; // нельзя перенести узел в его же поддерево
+  pushUndo();
+  oldParent.children = oldParent.children.filter((child) => child.id !== node.id);
+  newParent.children.push(node);
   persistNetworkScheme();
   renderTree();
   renderPanel();
@@ -433,6 +526,34 @@ function renderNodeEl(node) {
   const calc = lastCalcMap?.get(node.id);
   if (calc?.error) card.classList.add('has-error');
 
+  if (!isRoot) {
+    card.draggable = true;
+    card.addEventListener('dragstart', (event) => {
+      draggedNodeId = node.id;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', node.id);
+      card.classList.add('dragging');
+    });
+    card.addEventListener('dragend', () => {
+      draggedNodeId = null;
+      card.classList.remove('dragging');
+    });
+  }
+
+  card.addEventListener('dragover', (event) => {
+    if (!draggedNodeId || draggedNodeId === node.id) return;
+    const draggedNode = findNode(networkTree, draggedNodeId);
+    if (!draggedNode || isDescendantOrSelf(draggedNode, node.id)) return;
+    event.preventDefault();
+    card.classList.add('drag-over');
+  });
+  card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+  card.addEventListener('drop', (event) => {
+    event.preventDefault();
+    card.classList.remove('drag-over');
+    if (draggedNodeId) moveNode(draggedNodeId, node.id);
+  });
+
   const header = document.createElement('div');
   header.className = 'net-node-header';
 
@@ -454,6 +575,37 @@ function renderNodeEl(node) {
     selectNode(node.id);
   });
   toolbar.appendChild(paramsBtn);
+
+  if (!isRoot) {
+    const duplicateBtn = document.createElement('button');
+    duplicateBtn.type = 'button';
+    duplicateBtn.className = 'net-node-icon-btn net-node-duplicate-btn';
+    duplicateBtn.title = 'Дублировать узел вместе с поддеревом';
+    duplicateBtn.setAttribute('aria-label', 'Дублировать узел вместе с поддеревом');
+    duplicateBtn.textContent = '⧉';
+    duplicateBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      duplicateNode(node.id);
+    });
+    toolbar.appendChild(duplicateBtn);
+  }
+
+  if (node.children.length) {
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'net-node-icon-btn net-node-toggle-btn';
+    const toggleLabel = node.collapsed ? 'Развернуть ветвь' : 'Свернуть ветвь';
+    toggleBtn.title = toggleLabel;
+    toggleBtn.setAttribute('aria-label', toggleLabel);
+    toggleBtn.textContent = node.collapsed ? '▸' : '▾';
+    toggleBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      node.collapsed = !node.collapsed;
+      persistNetworkScheme();
+      renderTree();
+    });
+    toolbar.appendChild(toggleBtn);
+  }
 
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
@@ -506,6 +658,13 @@ function renderNodeEl(node) {
     card.appendChild(badge);
   }
 
+  if (calc?.balance) {
+    const balanceBadge = document.createElement('span');
+    balanceBadge.className = 'net-node-badge warn';
+    balanceBadge.textContent = '⚠ баланс нагрузки';
+    card.appendChild(balanceBadge);
+  }
+
   card.addEventListener('click', () => selectNode(node.id));
   card.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -516,7 +675,7 @@ function renderNodeEl(node) {
   wrap.appendChild(card);
   li.appendChild(wrap);
 
-  if (node.children.length) {
+  if (node.children.length && !node.collapsed) {
     const ul = document.createElement('ul');
     node.children.forEach((child) => ul.appendChild(renderNodeEl(child)));
     li.appendChild(ul);
@@ -821,6 +980,8 @@ function renderNodeResult(node) {
     ? `Рекомендуемое сечение кабеля: ${cableParts.join('; ')}`
     : 'Расчётный ток превышает диапазон табличных сечений — требуется индивидуальный подбор кабеля.';
 
+  nodeResPeSection.textContent = buildPeSectionText(protection);
+
   nodeResVoltageDrop.textContent = '';
   nodeResVoltageDrop.classList.remove('warn');
   if (voltageDrop) {
@@ -854,6 +1015,39 @@ function renderNodeResult(node) {
       `Наибольший номинал среди дочерних линий — ${maxOfChildBreakers} А; сумма номиналов дочерних линий — ` +
       `${sumOfChildBreakers} А. Автомат этого узла не подобран (расчётный ток вне диапазона таблицы) — проверка ` +
       'селективности невозможна.';
+  }
+
+  nodeResBalance.textContent = '';
+  nodeResBalance.classList.remove('warn');
+  if (calc.balance) {
+    const { rawCurrent, breaker, cableAmpacity, overBreaker, overCable } = calc.balance;
+    const exceeded = [];
+    if (overBreaker) exceeded.push(`автомат узла (${breaker} А)`);
+    if (overCable) exceeded.push(`допустимый ток кабеля (${cableAmpacity} А)`);
+    nodeResBalance.textContent =
+      `⚠ Без учёта коэффициента одновременности (Кс = ${node.simultaneityFactor}) суммарный ток дочерних узлов ` +
+      `составил бы ${rawCurrent.toFixed(2)} А — это больше, чем ${exceeded.join(' и ')}. Защита узла держится ` +
+      'только на справедливости принятого Кс, без запаса: проверьте, действительно ли дочерние линии не работают ' +
+      'одновременно на полную нагрузку.';
+    nodeResBalance.classList.add('warn');
+  }
+
+  nodeResShortCircuit.textContent = '';
+  nodeResShortCircuit.classList.remove('warn');
+  if (calc.shortCircuit) {
+    const { i3, i1, curve, disconnection } = calc.shortCircuit;
+    let text =
+      `Приближённая оценка тока КЗ в этой точке: Iкз(3) ≈ ${formatShortCircuitCurrent(i3)}, Iкз(1) ≈ ` +
+      `${formatShortCircuitCurrent(i1)} (сопротивление кабелей выше по дереву накоплено от трансформатора; ` +
+      'индуктивные составляющие и сопротивление выше трансформатора не учитываются).';
+    if (disconnection) {
+      text += disconnection.ok
+        ? ` ✓ При характеристике ${curve} отключение заведомо быстрее нормативных 0,4 с / 0,2 с.`
+        : ` ✗ При характеристике ${curve} быстрое отключение не гарантировано — см. мини-калькулятор КЗ на ` +
+          'вкладке «Справка».';
+      nodeResShortCircuit.classList.toggle('warn', !disconnection.ok);
+    }
+    nodeResShortCircuit.textContent = text;
   }
 }
 
@@ -889,6 +1083,12 @@ function renderPanel() {
   nodeCableLegend.textContent = isRoot ? 'Вводной кабель' : 'Кабель от родительского узла';
   nodeKcField.hidden = node.children.length === 0;
 
+  nodeTransformerField.hidden = !isRoot;
+  if (isRoot) {
+    nodeTransformerPowerInput.value = node.transformerPowerKva || '';
+    nodeTransformerUkInput.value = node.transformerUkPercent || '';
+  }
+
   updateNodeLoadFieldsUI();
   updateNodeKnownFieldsUI();
   updateNodeLoadTypeUI();
@@ -920,6 +1120,10 @@ function onPanelChange() {
   node.utilizationFactor = Number(nodeUtilizationInput.value) || 1;
   node.loadType = nodeLoadTypeSelect.value;
   node.startCurrentRatio = Number(nodeStartRatioInput.value) || DEFAULT_START_CURRENT_RATIO;
+  if (node.id === networkTree.id) {
+    node.transformerPowerKva = Number(nodeTransformerPowerInput.value) || null;
+    node.transformerUkPercent = Number(nodeTransformerUkInput.value) || null;
+  }
 
   netPanelTitle.textContent = node.name;
   updateNodeLoadFieldsUI();
@@ -939,6 +1143,7 @@ nodeNetworkTypeSelect.addEventListener('change', () => {
   nodePowerValueInput, nodePowerUnitSelect, nodeCurrentValueInput, nodeInstallationSelect,
   nodeCableCountInput, nodeCableLengthInput, nodeKcInput,
   nodeUtilizationInput, nodeLoadTypeSelect, nodeStartRatioInput,
+  nodeTransformerPowerInput, nodeTransformerUkInput,
   ...document.querySelectorAll('input[name="node-known"]'),
 ].forEach((el) => {
   el.addEventListener('input', onPanelChange);
@@ -947,12 +1152,25 @@ nodeNetworkTypeSelect.addEventListener('change', () => {
 
 calcNetworkBtn.addEventListener('click', () => {
   if (!networkTree) return;
-  const resultTree = calculateTree(networkTree);
+  const resultTree = annotateShortCircuit(networkTree, calculateTree(networkTree));
   lastCalcMap = flattenCalc(resultTree);
   const errors = collectErrors(resultTree);
   networkErrorMessage.textContent = errors.length ? `Не удалось рассчитать: ${errors.join('; ')}.` : '';
   renderTree();
   renderPanel();
+});
+
+undoNetworkBtn.addEventListener('click', () => {
+  if (!undoStack.length) return;
+  networkTree = undoStack.pop();
+  if (!findNode(networkTree, selectedNodeId)) selectedNodeId = networkTree.id;
+  lastCalcMap = null;
+  networkErrorMessage.textContent = '';
+  updateUndoButtonUI();
+  persistNetworkScheme();
+  renderTree();
+  renderPanel();
+  renderProjectList();
 });
 
 function sanitizeFileName(name) {
@@ -1003,8 +1221,66 @@ exportDxfBtn.addEventListener('click', () => {
   }
 });
 
+exportSpecBtn.addEventListener('click', () => {
+  if (!networkTree) return;
+  try {
+    const csv = buildSpecCsv(networkTree);
+    downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `${sanitizeFileName(networkTree.name)} — ведомость.csv`);
+    networkErrorMessage.textContent = '';
+  } catch (err) {
+    networkErrorMessage.textContent = `Не удалось построить ведомость: ${err.message}`;
+  }
+});
+
+const PROJECT_FILE_FORMAT = 'elapp-network-project';
+
+exportProjectBtn.addEventListener('click', () => {
+  if (!networkTree) return;
+  const data = JSON.stringify({ format: PROJECT_FILE_FORMAT, version: 1, tree: networkTree }, null, 2);
+  downloadBlob(new Blob([data], { type: 'application/json' }), `${sanitizeFileName(networkTree.name)}.json`);
+});
+
+importProjectBtn.addEventListener('click', () => importProjectInput.click());
+
+importProjectInput.addEventListener('change', () => {
+  const file = importProjectInput.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    importProjectInput.value = ''; // позволяет повторно выбрать тот же файл
+    let parsed;
+    try {
+      parsed = JSON.parse(String(reader.result));
+    } catch {
+      networkErrorMessage.textContent = 'Не удалось загрузить проект: файл не является корректным JSON.';
+      return;
+    }
+    const tree = parsed?.tree;
+    if (!tree || typeof tree !== 'object' || !Array.isArray(tree.children)) {
+      networkErrorMessage.textContent = 'Не удалось загрузить проект: файл не содержит схему сети в ожидаемом формате.';
+      return;
+    }
+    if (!confirm('Загрузить схему из файла? Текущая схема будет заменена.')) return;
+    pushUndo();
+    networkTree = tree;
+    selectedNodeId = networkTree.id;
+    activeProjectId = null; // загруженный из файла проект не привязан к сохранённому
+    lastCalcMap = null;
+    networkErrorMessage.textContent = '';
+    persistNetworkScheme();
+    renderTree();
+    renderPanel();
+    renderProjectList();
+  };
+  reader.onerror = () => {
+    networkErrorMessage.textContent = 'Не удалось прочитать файл проекта.';
+  };
+  reader.readAsText(file);
+});
+
 resetNetworkBtn.addEventListener('click', () => {
   if (!confirm('Удалить все узлы и параметры сети и начать сначала?')) return;
+  pushUndo();
   networkTree = buildDefaultTree();
   selectedNodeId = networkTree.id;
   activeProjectId = null;
@@ -1022,6 +1298,7 @@ openProjectBtn.addEventListener('click', () => {
   const project = networkProjectSelect.value ? getProject(networkProjectSelect.value) : null;
   if (!project) return;
   if (!confirm(`Открыть проект «${project.name}»? Текущая схема будет заменена схемой проекта.`)) return;
+  pushUndo();
   networkTree = project.tree;
   selectedNodeId = networkTree.id;
   activeProjectId = project.id;
@@ -1068,6 +1345,7 @@ networkTree = savedNetworkScheme ? savedNetworkScheme.tree : buildDefaultTree();
 selectedNodeId = networkTree.id;
 activeProjectId = savedNetworkScheme?.activeProjectId ?? null;
 if (!savedNetworkScheme) persistNetworkScheme();
+updateUndoButtonUI();
 renderTree();
 renderPanel();
 renderProjectList();
@@ -1112,6 +1390,8 @@ function renderResults(result, protection, line, extra = {}) {
   resCable.textContent = cableParts.length
     ? `Рекомендуемое сечение кабеля: ${cableParts.join('; ')}`
     : 'Расчётный ток превышает диапазон табличных сечений — требуется индивидуальный подбор кабеля.';
+
+  resPeSection.textContent = buildPeSectionText(protection);
 
   const methodLabel = INSTALLATION_LABELS[line.installationMethod] ?? '';
   resCorrection.textContent = protection.correction < 1
@@ -1309,6 +1589,134 @@ form.addEventListener('submit', (event) => {
     },
     { persist: true },
   );
+});
+
+// --- Перекрёстные ссылки из калькулятора в справочник -----------------------
+// Ссылки с классом ref-link открывают вкладку «Справка» и прокручивают к
+// нужной главе (внутри неактивной вкладки якоря не работают сами по себе).
+document.addEventListener('click', (event) => {
+  const link = event.target.closest('a.ref-link');
+  if (!link) return;
+  event.preventDefault();
+  const targetId = (link.getAttribute('href') || '').replace('#', '');
+  if (!targetId) return;
+  switchTab('about');
+  requestAnimationFrame(() => {
+    document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+
+// --- Мини-калькулятор тока КЗ ------------------------------------------------
+const scLineVoltageInput = document.getElementById('sc-line-voltage');
+const scTransformerPowerInput = document.getElementById('sc-transformer-power');
+const scUkInput = document.getElementById('sc-uk');
+const scMaterialSelect = document.getElementById('sc-material');
+const scLengthInput = document.getElementById('sc-length');
+const scSectionInput = document.getElementById('sc-section');
+const scBreakerInput = document.getElementById('sc-breaker');
+const scCurveSelect = document.getElementById('sc-curve');
+const scIcuInput = document.getElementById('sc-icu');
+const scCalcBtn = document.getElementById('sc-calc-btn');
+const scError = document.getElementById('sc-error');
+const scResult = document.getElementById('sc-result');
+const scResImpedance = document.getElementById('sc-res-impedance');
+const scResI3 = document.getElementById('sc-res-i3');
+const scResI1 = document.getElementById('sc-res-i1');
+const scResIcu = document.getElementById('sc-res-icu');
+const scResTime = document.getElementById('sc-res-time');
+
+/** Ток КЗ в А или кА (для крупных значений) с разделителями разрядов. */
+function formatShortCircuitCurrent(amps) {
+  if (amps >= 1000) {
+    return `${(amps / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} кА (${amps.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} А)`;
+  }
+  return `${amps.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} А`;
+}
+
+function runShortCircuitCalculation() {
+  scError.textContent = '';
+  const lineVoltage = Number(scLineVoltageInput.value);
+  const ratedPowerKva = Number(scTransformerPowerInput.value);
+  const shortCircuitVoltagePercent = Number(scUkInput.value);
+  const material = scMaterialSelect.value;
+  const length = Number(scLengthInput.value);
+  const section = Number(scSectionInput.value);
+
+  if (!(lineVoltage > 0) || !(ratedPowerKva > 0) || !(shortCircuitVoltagePercent > 0)
+    || !(length > 0) || !(section > 0)) {
+    scResult.hidden = true;
+    scError.textContent =
+      'Заполните напряжение, мощность и uк трансформатора, длину и сечение кабеля положительными числами.';
+    return;
+  }
+
+  let r;
+  try {
+    r = calculateShortCircuit({ lineVoltage, ratedPowerKva, shortCircuitVoltagePercent, length, section, material });
+  } catch (err) {
+    scResult.hidden = true;
+    scError.textContent = err.message;
+    return;
+  }
+
+  scResImpedance.textContent =
+    `Сопротивление трансформатора Zт ≈ ${r.zT.toFixed(4)} Ом, сопротивление кабеля Rкаб ≈ ` +
+    `${r.rCable.toFixed(4)} Ом (на одну жилу).`;
+  scResI3.textContent = `Ток трёхфазного КЗ Iкз(3) ≈ ${formatShortCircuitCurrent(r.i3)} — для проверки отключающей способности автомата.`;
+  scResI1.textContent = `Ток однофазного КЗ «фаза — ноль» Iкз(1) ≈ ${formatShortCircuitCurrent(r.i1)} — для проверки времени автоматического отключения.`;
+
+  // Проверка отключающей способности Icu ≥ Iкз(3).
+  const icuKa = Number(scIcuInput.value);
+  scResIcu.classList.remove('warn');
+  if (icuKa > 0) {
+    const ok = icuKa * 1000 >= r.i3;
+    scResIcu.textContent = ok
+      ? `✓ Отключающая способность Icu = ${icuKa} кА ≥ Iкз(3) (${formatShortCircuitCurrent(r.i3)}) — автомат подходит по Icu.`
+      : `✗ Отключающая способность Icu = ${icuKa} кА меньше Iкз(3) (${formatShortCircuitCurrent(r.i3)}) — нужен автомат с большей Icu.`;
+    scResIcu.classList.toggle('warn', !ok);
+  } else {
+    scResIcu.textContent = '';
+  }
+
+  // Проверка времени отключения по характеристике автомата.
+  const breakerRating = Number(scBreakerInput.value);
+  scResTime.classList.remove('warn');
+  if (breakerRating > 0) {
+    const check = checkDisconnectionByCurve({ singlePhaseCurrent: r.i1, breakerRating, curve: scCurveSelect.value });
+    if (check) {
+      scResTime.textContent = check.ok
+        ? `✓ Iкз(1) (${formatShortCircuitCurrent(r.i1)}) ≥ порога мгновенного расцепления ${Math.round(check.tripThreshold)} А ` +
+          `(${scCurveSelect.value}·${breakerRating}) — отключение заведомо быстрее нормативных 0,4 с / 0,2 с.`
+        : `✗ Iкз(1) (${formatShortCircuitCurrent(r.i1)}) ниже порога мгновенного расцепления ${Math.round(check.tripThreshold)} А ` +
+          `(${scCurveSelect.value}·${breakerRating}) — быстрое отключение не гарантировано: уменьшите длину, увеличьте сечение ` +
+          'или выберите характеристику с меньшей кратностью (C→B) либо примените УЗО.';
+      scResTime.classList.toggle('warn', !check.ok);
+    } else {
+      scResTime.textContent = '';
+    }
+  } else {
+    scResTime.textContent = '';
+  }
+
+  scResult.hidden = false;
+}
+
+scCalcBtn.addEventListener('click', runShortCircuitCalculation);
+
+// --- Поиск по глоссарию -----------------------------------------------------
+const glossarySearchInput = document.getElementById('glossary-search');
+const glossaryItems = Array.from(document.querySelectorAll('#glossary-list .glossary-item'));
+const glossaryEmpty = document.getElementById('glossary-empty');
+
+glossarySearchInput.addEventListener('input', () => {
+  const query = glossarySearchInput.value.trim().toLowerCase();
+  let visibleCount = 0;
+  glossaryItems.forEach((item) => {
+    const match = !query || item.textContent.toLowerCase().includes(query);
+    item.hidden = !match;
+    if (match) visibleCount += 1;
+  });
+  glossaryEmpty.hidden = visibleCount > 0;
 });
 
 renderHistory();

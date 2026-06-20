@@ -6,6 +6,7 @@ import {
   recommendProtection,
   recommendBreakerCurve,
   checkSelectivity,
+  recommendPeSection,
   BREAKER_RATINGS,
   SELECTIVITY_SAFE_RATIO,
 } from '../js/tables.js';
@@ -119,4 +120,28 @@ test('checkSelectivity: номинал вышестоящего не больш�
 test('checkSelectivity возвращает null без вышестоящего номинала или дочерних линий', () => {
   assert.equal(checkSelectivity(null, [16]), null);
   assert.equal(checkSelectivity(32, []), null);
+});
+
+test('recommendPeSection: при S ≤ 16 мм² сечение PE равно фазному', () => {
+  assert.equal(recommendPeSection(1.5), 1.5);
+  assert.equal(recommendPeSection(10), 10);
+  assert.equal(recommendPeSection(16), 16);
+});
+
+test('recommendPeSection: при 16 < S ≤ 35 мм² сечение PE равно 16 мм²', () => {
+  assert.equal(recommendPeSection(25), 16);
+  assert.equal(recommendPeSection(35), 16);
+});
+
+test('recommendPeSection: при S > 35 мм² сечение PE не менее половины фазного (с округлением вверх)', () => {
+  assert.equal(recommendPeSection(50), 25); // 25 ≥ 25
+  assert.equal(recommendPeSection(70), 35); // 35 ≥ 35
+  assert.equal(recommendPeSection(95), 50); // 47.5 → 50
+  assert.equal(recommendPeSection(120), 70); // 60 → 70
+});
+
+test('recommendPeSection: некорректный аргумент → null', () => {
+  assert.equal(recommendPeSection(0), null);
+  assert.equal(recommendPeSection(-5), null);
+  assert.equal(recommendPeSection(undefined), null);
 });

@@ -6,6 +6,7 @@
 
 import { calculate, calculateVoltageDrop, NETWORK_TYPES } from './calculations.js';
 import { recommendProtection, checkSelectivity } from './tables.js';
+import { transformerImpedance, cableResistance, checkDisconnectionByCurve } from './shortCircuit.js';
 
 const PHASE_FACTOR = {
   [NETWORK_TYPES.DC]: 1,
@@ -156,6 +157,25 @@ export function calculateTree(node) {
       ? checkSelectivity(calc.protection.breaker, childBreakerValues)
       : null;
 
+  // Проверка баланса: автомат и кабель узла подбираются по нагрузке с учётом
+  // принятого коэффициента одновременности Кс дочерних узлов (childrenTotals
+  // уже умножен на Кс при расчёте calc). Если бы все дочерние линии работали
+  // одновременно на полную расчётную нагрузку (Кс = 1, т.е. без диверсификации),
+  // ток мог бы превысить номинал автомата узла или допустимый ток его кабеля —
+  // тогда защита узла держится только на справедливости принятого Кс, без запаса.
+  let balance = null;
+  if (calc?.protection && !failedChild && node.voltage > 0) {
+    const k = PHASE_FACTOR[node.networkType] ?? 1;
+    const rawS = Math.sqrt(childrenTotals.P * childrenTotals.P + childrenTotals.Q * childrenTotals.Q);
+    const rawCurrent = node.networkType === NETWORK_TYPES.DC ? childrenTotals.P / node.voltage : rawS / (k * node.voltage);
+    const cableAmpacity = calc.protection.copperCable?.ratedCurrent ?? calc.protection.aluminumCable?.ratedCurrent ?? null;
+    const overBreaker = calc.protection.breaker != null && rawCurrent > calc.protection.breaker;
+    const overCable = cableAmpacity != null && rawCurrent > cableAmpacity;
+    if (overBreaker || overCable) {
+      balance = { rawCurrent, breaker: calc.protection.breaker, cableAmpacity, overBreaker, overCable };
+    }
+  }
+
   return {
     id: node.id,
     name: node.name,
@@ -170,6 +190,67 @@ export function calculateTree(node) {
     sumOfChildBreakers,
     maxOfChildBreakers,
     selectivity,
+    balance,
+    shortCircuit: null,
     children,
   };
+}
+
+function chosenCable(protection) {
+  if (protection?.copperCable) return { section: protection.copperCable.section, material: 'copper' };
+  if (protection?.aluminumCable) return { section: protection.aluminumCable.section, material: 'aluminum' };
+  return null;
+}
+
+/**
+ * Дополняет результат calculateTree оценкой тока короткого замыкания в каждом
+ * узле. Активное сопротивление кабелей накапливается по пути от точки ввода
+ * (трансформатора) до узла — так же, как физически складывается петля КЗ, в
+ * отличие от calculateLineVoltageDrop, который учитывает только одну линию.
+ * Требует параметры трансформатора на корневом узле (transformerPowerKva,
+ * transformerUkPercent); без них дерево возвращается без изменений (у каждого
+ * узла shortCircuit остаётся null). Расчёт приближённый (см. js/shortCircuit.js):
+ * сопротивления выше трансформатора и индуктивные составляющие не учитываются.
+ * Проверка времени отключения проводится по характеристике автомата C, если
+ * для узла не подобрана другая (см. recommendedCurve для электродвигателей) —
+ * это наиболее распространённая характеристика, но не единственно возможная.
+ */
+export function annotateShortCircuit(rootNode, rootCalc) {
+  const { transformerPowerKva, transformerUkPercent } = rootNode;
+  if (!(transformerPowerKva > 0) || !(transformerUkPercent > 0)) return rootCalc;
+
+  let zT;
+  try {
+    zT = transformerImpedance({
+      ratedPowerKva: transformerPowerKva,
+      shortCircuitVoltagePercent: transformerUkPercent,
+      lineVoltage: rootNode.voltage,
+    });
+  } catch {
+    return rootCalc;
+  }
+  const phaseVoltage = rootNode.voltage / Math.sqrt(3);
+
+  const walk = (node, calcNode, parentResistance) => {
+    const cable = chosenCable(calcNode.protection);
+    const resistance =
+      parentResistance + (cable && node.cableLength > 0
+        ? cableResistance({ length: node.cableLength, section: cable.section, material: cable.material })
+        : 0);
+
+    if (calcNode.result && !calcNode.error) {
+      const i3 = phaseVoltage / (zT + resistance);
+      const i1 = phaseVoltage / (zT + 2 * resistance);
+      const curve = calcNode.protection?.recommendedCurve ?? 'C';
+      const disconnection = calcNode.protection?.breaker
+        ? checkDisconnectionByCurve({ singlePhaseCurrent: i1, breakerRating: calcNode.protection.breaker, curve })
+        : null;
+      calcNode.shortCircuit = { zT, resistance, i3, i1, curve, disconnection };
+    }
+
+    node.children.forEach((child, index) => walk(child, calcNode.children[index], resistance));
+  };
+
+  walk(rootNode, rootCalc, 0);
+  return rootCalc;
 }
