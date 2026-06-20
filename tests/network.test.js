@@ -187,6 +187,121 @@ test('calculateTree считает дерево из нескольких уро
   assert.equal(result.children[0].result.I, 10);
 });
 
+test('calculateNode: коэффициент использования Ku снижает расчётную нагрузку относительно установленной', () => {
+  const node = calculateNode({
+    networkType: NETWORK_TYPES.DC,
+    voltage: 24,
+    hasOwnLoad: true,
+    known: 'power',
+    knownValue: 240,
+    installationMethod: 'air',
+    cableCount: 1,
+    cableLength: 0,
+    utilizationFactor: 0.5,
+  });
+  assert.equal(node.installed.P, 240);
+  assert.equal(node.result.P, 120);
+  assert.equal(node.result.I, 5);
+  assert.equal(node.utilizationFactor, 0.5);
+});
+
+test('calculateNode: ошибка при некорректном Ku', () => {
+  assert.throws(() =>
+    calculateNode({
+      networkType: NETWORK_TYPES.DC,
+      voltage: 24,
+      hasOwnLoad: true,
+      known: 'power',
+      knownValue: 240,
+      installationMethod: 'air',
+      cableCount: 1,
+      utilizationFactor: 1.5,
+    }),
+  );
+});
+
+test('calculateNode: для двигательной нагрузки считает пусковой ток и подбирает характеристику автомата', () => {
+  const node = calculateNode({
+    networkType: NETWORK_TYPES.DC,
+    voltage: 24,
+    hasOwnLoad: true,
+    known: 'power',
+    knownValue: 240,
+    installationMethod: 'air',
+    cableCount: 1,
+    loadType: 'motor',
+    startCurrentRatio: 6,
+  });
+  assert.equal(node.result.I, 10);
+  assert.equal(node.startCurrent, 60);
+  assert.equal(node.protection.startCurrent, 60);
+  assert.equal(node.protection.recommendedCurve, 'C'); // 60/10=6 -> укладывается в C (≤10)
+});
+
+test('calculateNode: для общей нагрузки пусковой ток не считается', () => {
+  const node = calculateNode({
+    networkType: NETWORK_TYPES.DC,
+    voltage: 24,
+    hasOwnLoad: true,
+    known: 'power',
+    knownValue: 240,
+    installationMethod: 'air',
+    cableCount: 1,
+  });
+  assert.equal(node.startCurrent, null);
+  assert.equal(node.protection.recommendedCurve, null);
+});
+
+test('calculateTree считает наибольший номинал среди дочерних автоматов и проверяет селективность', () => {
+  const tree = {
+    id: 'root',
+    name: 'ВРУ',
+    networkType: NETWORK_TYPES.DC,
+    voltage: 24,
+    hasOwnLoad: false,
+    installationMethod: 'air',
+    cableCount: 1,
+    cableLength: 0,
+    simultaneityFactor: 1,
+    children: [
+      {
+        id: 'a',
+        name: 'Освещение',
+        networkType: NETWORK_TYPES.DC,
+        voltage: 24,
+        hasOwnLoad: true,
+        known: 'power',
+        knownValue: 240,
+        installationMethod: 'air',
+        cableCount: 1,
+        cableLength: 0,
+        children: [],
+      },
+      {
+        id: 'b',
+        name: 'Розетки',
+        networkType: NETWORK_TYPES.DC,
+        voltage: 24,
+        hasOwnLoad: true,
+        known: 'power',
+        knownValue: 120,
+        installationMethod: 'air',
+        cableCount: 1,
+        cableLength: 0,
+        children: [],
+      },
+    ],
+  };
+
+  const result = calculateTree(tree);
+  assert.equal(result.protection.breaker, 16);
+  assert.equal(result.maxOfChildBreakers, 10);
+  assert.ok(result.selectivity);
+  assert.equal(result.selectivity.maxDownstream, 10);
+  assert.ok(Math.abs(result.selectivity.ratio - 1.6) < 1e-9);
+  assert.equal(result.selectivity.level, 'uncertain'); // 16/10 = 1.6, в диапазоне (1, SELECTIVITY_SAFE_RATIO)
+});
+
 test('calculateTree: ошибка в листовом узле блокирует только его предков, а не соседние ветви', () => {
   const tree = {
     id: 'root',

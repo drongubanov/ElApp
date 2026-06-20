@@ -1,6 +1,12 @@
 import { calculate, calculateVoltageDrop, NETWORK_TYPES } from './calculations.js';
-import { recommendProtection, INSTALLATION_LABELS, CABLE_TABLE, CABLE_TABLE_SOURCE } from './tables.js';
-import { calculateTree } from './network.js';
+import {
+  recommendProtection,
+  INSTALLATION_LABELS,
+  CABLE_TABLE,
+  CABLE_TABLE_SOURCE,
+  SELECTIVITY_SAFE_RATIO,
+} from './tables.js';
+import { calculateTree, DEFAULT_START_CURRENT_RATIO } from './network.js';
 import { loadNetworkScheme, saveNetworkScheme } from './networkStorage.js';
 import { buildSchemeLayout } from './schemeLayout.js';
 import { buildSheet } from './schemeSheet.js';
@@ -52,6 +58,11 @@ const powerValueInput = document.getElementById('power-value');
 const powerUnitSelect = document.getElementById('power-unit');
 const currentField = document.getElementById('current-field');
 const currentValueInput = document.getElementById('current-value');
+const utilizationField = document.getElementById('utilization-field');
+const utilizationInput = document.getElementById('utilization-factor');
+const loadTypeSelect = document.getElementById('load-type');
+const startRatioField = document.getElementById('start-ratio-field');
+const startRatioInput = document.getElementById('start-ratio');
 const installationMethodSelect = document.getElementById('installation-method');
 const cableCountInput = document.getElementById('cable-count');
 const cableLengthInput = document.getElementById('cable-length');
@@ -62,6 +73,7 @@ const resP = document.getElementById('res-p');
 const resS = document.getElementById('res-s');
 const resQ = document.getElementById('res-q');
 const resI = document.getElementById('res-i');
+const resLoadDiagram = document.getElementById('res-load-diagram');
 const resBreaker = document.getElementById('res-breaker');
 const resCable = document.getElementById('res-cable');
 const resCorrection = document.getElementById('res-correction');
@@ -96,6 +108,11 @@ const nodePowerValueInput = document.getElementById('node-power-value');
 const nodePowerUnitSelect = document.getElementById('node-power-unit');
 const nodeCurrentField = document.getElementById('node-current-field');
 const nodeCurrentValueInput = document.getElementById('node-current-value');
+const nodeUtilizationField = document.getElementById('node-utilization-field');
+const nodeUtilizationInput = document.getElementById('node-utilization-factor');
+const nodeLoadTypeSelect = document.getElementById('node-load-type');
+const nodeStartRatioField = document.getElementById('node-start-ratio-field');
+const nodeStartRatioInput = document.getElementById('node-start-ratio');
 const nodeCableLegend = document.getElementById('node-cable-legend');
 const nodeInstallationSelect = document.getElementById('node-installation');
 const nodeCableCountInput = document.getElementById('node-cable-count');
@@ -109,6 +126,7 @@ const nodeResP = document.getElementById('node-res-p');
 const nodeResS = document.getElementById('node-res-s');
 const nodeResQ = document.getElementById('node-res-q');
 const nodeResI = document.getElementById('node-res-i');
+const nodeResLoadDiagram = document.getElementById('node-res-load-diagram');
 const nodeResBreaker = document.getElementById('node-res-breaker');
 const nodeResCable = document.getElementById('node-res-cable');
 const nodeResVoltageDrop = document.getElementById('node-res-voltage-drop');
@@ -156,10 +174,20 @@ function updateKnownFieldUI() {
   const known = form.querySelector('input[name="known"]:checked').value;
   powerField.hidden = known !== 'power';
   currentField.hidden = known !== 'current';
+  // Ku осмыслен только как отношение расчётной нагрузки к введённой
+  // установленной мощности — для прямо заданного тока он не применяется.
+  utilizationField.hidden = known !== 'power';
+}
+
+function updateLoadTypeUI() {
+  startRatioField.hidden = loadTypeSelect.value !== 'motor';
 }
 
 knownRadios.forEach((radio) => radio.addEventListener('change', updateKnownFieldUI));
 updateKnownFieldUI();
+
+loadTypeSelect.addEventListener('change', updateLoadTypeUI);
+updateLoadTypeUI();
 
 pfPresetButtons.forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -194,6 +222,9 @@ function createNode(overrides = {}) {
     cableCount: 1,
     cableLength: 0,
     simultaneityFactor: 1,
+    utilizationFactor: 1,
+    loadType: 'general',
+    startCurrentRatio: DEFAULT_START_CURRENT_RATIO,
     children: [],
     ...overrides,
   };
@@ -695,6 +726,11 @@ function updateNodeKnownFieldsUI() {
   nodeCurrentField.hidden = known !== 'current';
   nodePfField.hidden = nodeNetworkTypeSelect.value === NETWORK_TYPES.DC;
   nodeVoltageInput.placeholder = VOLTAGE_PLACEHOLDERS[nodeNetworkTypeSelect.value] ?? '';
+  nodeUtilizationField.hidden = known !== 'power';
+}
+
+function updateNodeLoadTypeUI() {
+  nodeStartRatioField.hidden = nodeLoadTypeSelect.value !== 'motor';
 }
 
 function renderNodeResult(node) {
@@ -711,15 +747,29 @@ function renderNodeResult(node) {
   }
 
   nodeResultEl.hidden = false;
-  const { result, protection, voltageDrop, sumOfChildBreakers } = calc;
+  const { result, protection, voltageDrop, sumOfChildBreakers, maxOfChildBreakers, selectivity, installed, startCurrent } = calc;
   nodeResP.textContent = formatPower(result.P);
   nodeResS.textContent = formatApparentPower(result.S);
   nodeResQ.textContent = formatReactivePower(result.Q);
   nodeResI.textContent = formatCurrent(result.I);
 
-  nodeResBreaker.textContent = protection.breaker
+  nodeResLoadDiagram.textContent =
+    installed && node.utilizationFactor < 1
+      ? `Установленная (паспортная) мощность собственной нагрузки узла: ${formatPower(installed.P)}; расчётная ` +
+        `(с учётом Ku = ${node.utilizationFactor}): ${formatPower(calc.ownP)} — используется для подбора защиты и кабеля.`
+      : '';
+
+  let breakerText = protection.breaker
     ? `Рекомендуемый автоматический выключатель: ${protection.breaker} А (расчётный ток ${result.I.toFixed(2)} А)`
     : `Расчётный ток (${result.I.toFixed(2)} А) превышает диапазон таблицы — требуется индивидуальный подбор оборудования.`;
+  if (startCurrent) {
+    breakerText += protection.curveOverRange
+      ? ` Пусковой ток ${startCurrent.toFixed(2)} А выходит за пределы стандартных характеристик B/C/D для этого ` +
+        'номинала — нужен автомат со специальной уставкой расцепителя или устройство плавного пуска.'
+      : ` Пусковой ток ${startCurrent.toFixed(2)} А (Кп = ${node.startCurrentRatio}) — характеристика не ниже ` +
+        `${protection.recommendedCurve} (электромагнитный расцепитель не сработает ложно при пуске).`;
+  }
+  nodeResBreaker.textContent = breakerText;
 
   const cableParts = [];
   if (protection.copperCable) {
@@ -744,12 +794,28 @@ function renderNodeResult(node) {
     nodeResVoltageDrop.classList.toggle('warn', !withinLimit);
   }
 
-  nodeResSelectivity.textContent = node.children.length
-    ? `Сумма номиналов автоматов дочерних линий — ${sumOfChildBreakers} А; автомат этого узла подобран по суммарной ` +
-      `нагрузке с учётом Кс = ${node.simultaneityFactor}. Если его номинал меньше этой суммы — это нормально при ` +
-      'условии, что не все дочерние линии работают одновременно на полную мощность; проверку селективности ' +
-      'срабатывания защит выполняйте по таблицам производителя аппаратов или с привлечением специалиста.'
-    : '';
+  nodeResSelectivity.classList.remove('warn');
+  if (!node.children.length) {
+    nodeResSelectivity.textContent = '';
+  } else if (selectivity) {
+    const verdict = {
+      selective: '✓ Селективность обеспечена (приближённо)',
+      uncertain: '⚠ Селективность не гарантирована',
+      'not-selective': '✗ Селективность не обеспечена',
+    }[selectivity.level];
+    nodeResSelectivity.textContent =
+      `${verdict}: автомат узла ${protection.breaker} А, наибольший номинал среди дочерних линий — ` +
+      `${selectivity.maxDownstream} А (отношение ×${selectivity.ratio.toFixed(2)}; по приближённому правилу ` +
+      `селективность гарантируется при отношении ≥ ${SELECTIVITY_SAFE_RATIO}). Сумма номиналов дочерних линий — ` +
+      `${sumOfChildBreakers} А (узел рассчитан по нагрузке с учётом Кс = ${node.simultaneityFactor}, а не по этой ` +
+      'сумме). Полную проверку селективности выполняйте по времятоковым характеристикам аппаратов производителя.';
+    nodeResSelectivity.classList.toggle('warn', selectivity.level !== 'selective');
+  } else {
+    nodeResSelectivity.textContent =
+      `Наибольший номинал среди дочерних линий — ${maxOfChildBreakers} А; сумма номиналов дочерних линий — ` +
+      `${sumOfChildBreakers} А. Автомат этого узла не подобран (расчётный ток вне диапазона таблицы) — проверка ` +
+      'селективности невозможна.';
+  }
 }
 
 function renderPanel() {
@@ -776,6 +842,9 @@ function renderPanel() {
   nodeCableCountInput.value = node.cableCount;
   nodeCableLengthInput.value = node.cableLength || '';
   nodeKcInput.value = node.simultaneityFactor;
+  nodeUtilizationInput.value = node.utilizationFactor ?? 1;
+  nodeLoadTypeSelect.value = node.loadType ?? 'general';
+  nodeStartRatioInput.value = node.startCurrentRatio ?? DEFAULT_START_CURRENT_RATIO;
 
   const isRoot = node.id === networkTree.id;
   nodeCableLegend.textContent = isRoot ? 'Вводной кабель' : 'Кабель от родительского узла';
@@ -783,6 +852,7 @@ function renderPanel() {
 
   updateNodeLoadFieldsUI();
   updateNodeKnownFieldsUI();
+  updateNodeLoadTypeUI();
   renderNodeResult(node);
 }
 
@@ -808,10 +878,14 @@ function onPanelChange() {
   node.cableCount = Number(nodeCableCountInput.value) || 1;
   node.cableLength = Number(nodeCableLengthInput.value) || 0;
   node.simultaneityFactor = Number(nodeKcInput.value) || 1;
+  node.utilizationFactor = Number(nodeUtilizationInput.value) || 1;
+  node.loadType = nodeLoadTypeSelect.value;
+  node.startCurrentRatio = Number(nodeStartRatioInput.value) || DEFAULT_START_CURRENT_RATIO;
 
   netPanelTitle.textContent = node.name;
   updateNodeLoadFieldsUI();
   updateNodeKnownFieldsUI();
+  updateNodeLoadTypeUI();
   persistNetworkScheme();
   renderTree();
 }
@@ -825,6 +899,7 @@ nodeNetworkTypeSelect.addEventListener('change', () => {
   nodeNameInput, nodeHasOwnLoadInput, nodeVoltageInput, nodePfInput,
   nodePowerValueInput, nodePowerUnitSelect, nodeCurrentValueInput, nodeInstallationSelect,
   nodeCableCountInput, nodeCableLengthInput, nodeKcInput,
+  nodeUtilizationInput, nodeLoadTypeSelect, nodeStartRatioInput,
   ...document.querySelectorAll('input[name="node-known"]'),
 ].forEach((el) => {
   el.addEventListener('input', onPanelChange);
@@ -912,15 +987,30 @@ function showError(message) {
   resultsSection.hidden = true;
 }
 
-function renderResults(result, protection, line) {
+function renderResults(result, protection, line, extra = {}) {
+  const { installed, utilizationFactor = 1, startCurrent = null, startCurrentRatio = null } = extra;
   resP.textContent = formatPower(result.P);
   resS.textContent = formatApparentPower(result.S);
   resQ.textContent = formatReactivePower(result.Q);
   resI.textContent = formatCurrent(result.I);
 
-  resBreaker.textContent = protection.breaker
+  resLoadDiagram.textContent =
+    installed && utilizationFactor < 1
+      ? `Установленная (паспортная) мощность: ${formatPower(installed.P)}; расчётная мощность с учётом Ku = ` +
+        `${utilizationFactor}: ${formatPower(result.P)} — используется для подбора защиты и кабеля.`
+      : '';
+
+  let breakerText = protection.breaker
     ? `Рекомендуемый автоматический выключатель: ${protection.breaker} А (расчётный ток ${result.I.toFixed(2)} А)`
     : `Расчётный ток (${result.I.toFixed(2)} А) превышает диапазон таблицы — требуется индивидуальный подбор оборудования.`;
+  if (startCurrent) {
+    breakerText += protection.curveOverRange
+      ? ` Пусковой ток ${startCurrent.toFixed(2)} А выходит за пределы стандартных характеристик B/C/D для этого ` +
+        'номинала — нужен автомат со специальной уставкой расцепителя или устройство плавного пуска.'
+      : ` Пусковой ток ${startCurrent.toFixed(2)} А (Кп = ${startCurrentRatio}) — характеристика не ниже ` +
+        `${protection.recommendedCurve} (электромагнитный расцепитель не сработает ложно при пуске).`;
+  }
+  resBreaker.textContent = breakerText;
 
   const cableParts = [];
   if (protection.copperCable) {
@@ -1026,18 +1116,38 @@ function renderHistory() {
 }
 
 function runCalculation(
-  { networkType, voltage, powerFactor, known, knownValue, installationMethod, cableCount, cableLength },
+  {
+    networkType, voltage, powerFactor, known, knownValue, installationMethod, cableCount, cableLength,
+    utilizationFactor = 1, loadType = 'general', startCurrentRatio = DEFAULT_START_CURRENT_RATIO,
+  },
   { persist },
 ) {
   errorMessage.textContent = '';
   try {
-    const result = calculate({ networkType, voltage, powerFactor, known, knownValue });
-    const protection = recommendProtection(result.I, { installationMethod, cableCount });
-    renderResults(result, protection, { installationMethod, cableCount, cableLength });
+    const installed = calculate({ networkType, voltage, powerFactor, known, knownValue });
+    const ku = known === 'power' && utilizationFactor > 0 && utilizationFactor <= 1 ? utilizationFactor : 1;
+    const result = ku === 1
+      ? installed
+      : { ...installed, P: installed.P * ku, Q: installed.Q * ku, S: installed.S * ku, I: installed.I * ku };
+
+    const startCurrent = loadType === 'motor'
+      ? result.I * (startCurrentRatio > 0 ? startCurrentRatio : DEFAULT_START_CURRENT_RATIO)
+      : null;
+
+    const protection = recommendProtection(result.I, { installationMethod, cableCount, startCurrent });
+    renderResults(result, protection, { installationMethod, cableCount, cableLength }, {
+      installed: ku < 1 ? installed : null,
+      utilizationFactor: ku,
+      startCurrent,
+      startCurrentRatio,
+    });
 
     if (persist) {
       saveHistoryEntry({
-        input: { networkType, voltage, powerFactor, known, knownValue, installationMethod, cableCount, cableLength },
+        input: {
+          networkType, voltage, powerFactor, known, knownValue, installationMethod, cableCount, cableLength,
+          utilizationFactor: ku, loadType, startCurrentRatio,
+        },
         summary: buildHistorySummary(result),
       });
       renderHistory();
@@ -1064,11 +1174,18 @@ function restoreFromHistory(entry) {
   const installationMethod = input.installationMethod ?? 'air';
   const cableCount = input.cableCount ?? 1;
   const cableLength = input.cableLength ?? 0;
+  const utilizationFactor = input.utilizationFactor ?? 1;
+  const loadType = input.loadType ?? 'general';
+  const startCurrentRatio = input.startCurrentRatio ?? DEFAULT_START_CURRENT_RATIO;
   installationMethodSelect.value = installationMethod;
   cableCountInput.value = cableCount;
   cableLengthInput.value = cableLength || '';
+  utilizationInput.value = utilizationFactor;
+  loadTypeSelect.value = loadType;
+  startRatioInput.value = startCurrentRatio;
+  updateLoadTypeUI();
   switchTab('calc');
-  runCalculation({ ...input, installationMethod, cableCount, cableLength }, { persist: false });
+  runCalculation({ ...input, installationMethod, cableCount, cableLength, utilizationFactor, loadType, startCurrentRatio }, { persist: false });
 }
 
 clearHistoryBtn.addEventListener('click', () => {
@@ -1091,9 +1208,15 @@ form.addEventListener('submit', (event) => {
   const installationMethod = installationMethodSelect.value;
   const cableCount = Number(cableCountInput.value) || 1;
   const cableLength = Number(cableLengthInput.value) || 0;
+  const utilizationFactor = Number(utilizationInput.value) || 1;
+  const loadType = loadTypeSelect.value;
+  const startCurrentRatio = Number(startRatioInput.value) || DEFAULT_START_CURRENT_RATIO;
 
   runCalculation(
-    { networkType, voltage, powerFactor, known, knownValue, installationMethod, cableCount, cableLength },
+    {
+      networkType, voltage, powerFactor, known, knownValue, installationMethod, cableCount, cableLength,
+      utilizationFactor, loadType, startCurrentRatio,
+    },
     { persist: true },
   );
 });
