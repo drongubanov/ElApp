@@ -82,13 +82,12 @@ main {
 
 #tab-calc,
 #tab-history,
-#tab-about {
+#tab-about,
+#tab-network {
   max-width: 640px;
   margin: 0 auto;
 }
 
-/* Вкладка сети: все блоки используют всю доступную ширину main (до 1280px),
-   без выборочного сужения — иначе блоки выравниваются по разным краям. */
 .net-panel select,
 .net-panel input[type='number'] {
   max-width: 360px;
@@ -416,13 +415,18 @@ input:focus {
   gap: 10px;
 }
 
+#reset-network-btn {
+  margin-left: auto;
+}
+
 .net-actions-group .btn-primary {
   width: auto;
 }
 
-/* Только поле с деревом узлов выходит за ограничение ширины main (1280px)
+/* Только поле с деревом узлов выходит за ограничение ширины #tab-network (640px)
    и занимает всю ширину экрана — узлам нужно больше горизонтального места.
-   Остальные блоки вкладки (описание, кнопки, панель свойств) не затронуты. */
+   Остальные блоки вкладки (заголовок, описание, кнопки, панель свойств) сужены
+   до 640px, как и на других вкладках. */
 .net-tree-wrapper {
   overflow-x: auto;
   padding: 4px 16px 28px;
