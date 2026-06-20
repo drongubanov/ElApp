@@ -472,8 +472,31 @@ input:focus {
   filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.6));
 }
 
+/* Кружок с расчётным током на линии — скрыт по умолчанию, появляется
+   только на подсвеченном при наведении участке цепочки питания. */
+.net-connector-current {
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.net-connector-current circle {
+  fill: var(--color-surface);
+  stroke: var(--color-accent);
+  stroke-width: 1.5;
+}
+
+.net-connector-current text {
+  fill: var(--color-accent);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.net-tree.is-hovering .net-connector-current.on-hover-path {
+  opacity: 1;
+}
+
 .net-tree ul {
-  padding-top: 36px;
+  padding-top: 44px;
   position: relative;
 }
 
