@@ -94,6 +94,18 @@ main {
   max-width: 360px;
 }
 
+/* Вкладка сети выходит за ограничение ширины main (1280px) и занимает всю
+   ширину экрана — дереву узлов нужно больше места, чем другим вкладкам. */
+#tab-network {
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  padding-left: 16px;
+  padding-right: 16px;
+  box-sizing: border-box;
+}
+
 #node-load-fields,
 .net-panel .field-group {
   display: flex;
