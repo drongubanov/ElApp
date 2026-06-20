@@ -1345,6 +1345,19 @@ undoNetworkBtn.addEventListener('click', () => {
   renderProjectList();
 });
 
+undoNetworkBtn.addEventListener('click', () => {
+  if (!undoStack.length) return;
+  networkTree = undoStack.pop();
+  if (!findNode(networkTree, selectedNodeId)) selectedNodeId = networkTree.id;
+  lastCalcMap = null;
+  networkErrorMessage.textContent = '';
+  updateUndoButtonUI();
+  persistNetworkScheme();
+  renderTree();
+  renderPanel();
+  renderProjectList();
+});
+
 function sanitizeFileName(name) {
   return (name || 'Схема сети').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'Схема сети';
 }
