@@ -315,13 +315,12 @@
         <button type="button" id="multi-clear-btn" class="btn-secondary">Снять выделение</button>
       </div>
 
-      <div class="net-tree-wrapper">
-        <ul class="net-tree" id="network-tree"></ul>
-      </div>
+      <div class="net-workspace">
+        <div class="net-tree-wrapper">
+          <ul class="net-tree" id="network-tree"></ul>
+        </div>
 
-      <div class="net-add-menu" id="node-add-menu" role="menu" aria-label="Добавить узел" hidden></div>
-
-      <section class="net-panel" id="network-panel">
+        <section class="net-panel" id="network-panel">
         <div class="net-panel-header">
           <h3>Блок: <span id="net-panel-title"></span></h3>
         </div>
@@ -486,7 +485,10 @@
             <p id="node-res-shortcircuit" class="note-line"></p>
           </div>
         </div>
-      </section>
+        </section>
+      </div>
+
+      <div class="net-add-menu" id="node-add-menu" role="menu" aria-label="Добавить узел" hidden></div>
 
       <p class="disclaimer">
         Расчёт сети — предварительная оценка для эскизного проектирования: нагрузка каждого узла
