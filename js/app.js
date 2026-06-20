@@ -141,7 +141,15 @@ function updateNetworkTypeUI() {
   voltageInput.placeholder = VOLTAGE_PLACEHOLDERS[type] ?? '';
 }
 
-networkTypeSelect.addEventListener('change', updateNetworkTypeUI);
+function applyDefaultVoltage(type, input) {
+  if (type === NETWORK_TYPES.AC1) input.value = '220';
+  else if (type === NETWORK_TYPES.AC3) input.value = '380';
+}
+
+networkTypeSelect.addEventListener('change', () => {
+  updateNetworkTypeUI();
+  applyDefaultVoltage(networkTypeSelect.value, voltageInput);
+});
 updateNetworkTypeUI();
 
 function updateKnownFieldUI() {
@@ -808,8 +816,13 @@ function onPanelChange() {
   renderTree();
 }
 
+nodeNetworkTypeSelect.addEventListener('change', () => {
+  applyDefaultVoltage(nodeNetworkTypeSelect.value, nodeVoltageInput);
+  onPanelChange();
+});
+
 [
-  nodeNameInput, nodeHasOwnLoadInput, nodeNetworkTypeSelect, nodeVoltageInput, nodePfInput,
+  nodeNameInput, nodeHasOwnLoadInput, nodeVoltageInput, nodePfInput,
   nodePowerValueInput, nodePowerUnitSelect, nodeCurrentValueInput, nodeInstallationSelect,
   nodeCableCountInput, nodeCableLengthInput, nodeKcInput,
   ...document.querySelectorAll('input[name="node-known"]'),
