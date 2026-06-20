@@ -70,24 +70,77 @@ function groupingFactor(cableCount) {
   return GROUPING_FACTORS[Math.min(count, GROUPING_FACTORS.length) - 1];
 }
 
+// Кратность тока срабатывания электромагнитного расцепителя (отсечки) для
+// стандартных характеристик автоматов по ГОСТ Р 50345 / IEC 60898 — указан
+// верхний предел диапазона каждой характеристики (B: 3–5, C: 5–10, D: 10–20),
+// т.е. максимальная кратность тока, которую расцепитель данной характеристики
+// гарантированно не воспримет как короткое замыкание (только пусковой ток).
+export const BREAKER_CURVES = { B: 5, C: 10, D: 20 };
+
+/**
+ * Подбирает наименее «острую» стандартную характеристику автомата (B/C/D),
+ * при которой пусковой ток нагрузки не вызовет ложного срабатывания
+ * электромагнитного расцепителя при пуске. Возвращает null, если пусковой
+ * ток выходит за пределы даже характеристики D — нужен автомат со спец.
+ * уставкой расцепителя или устройство плавного пуска/частотный преобразователь.
+ */
+export function recommendBreakerCurve(startCurrent, breakerRating) {
+  if (!(startCurrent > 0) || !breakerRating) return null;
+  const type = Object.keys(BREAKER_CURVES).find((key) => BREAKER_CURVES[key] * breakerRating >= startCurrent);
+  return type ?? null;
+}
+
 /**
  * Подбирает автомат по расчётному току и кабели (медь/алюминий), способные
  * выдержать ток самого автомата — это гарантирует, что автомат защищает кабель.
  * Учитывает приближённые поправочные коэффициенты на способ прокладки и
  * количество кабелей, проложенных рядом (см. INSTALLATION_FACTORS).
+ * Если передан пусковой ток нагрузки (startCurrent, например для
+ * электродвигателя), дополнительно подбирает характеристику автомата (B/C/D),
+ * устойчивую к этому пусковому току без ложного срабатывания.
  */
-export function recommendProtection(current, { installationMethod = INSTALLATION_METHODS.AIR, cableCount = 1 } = {}) {
+export function recommendProtection(
+  current,
+  { installationMethod = INSTALLATION_METHODS.AIR, cableCount = 1, startCurrent = null } = {},
+) {
   const methodFactor = INSTALLATION_FACTORS[installationMethod] ?? 1;
   const groupFactor = groupingFactor(cableCount);
   const correction = methodFactor * groupFactor;
 
   const breaker = selectBreaker(current);
   const target = (breaker ?? current) / correction;
+  const hasStartCurrent = startCurrent > 0 && breaker;
+  const recommendedCurve = hasStartCurrent ? recommendBreakerCurve(startCurrent, breaker) : null;
   return {
     current,
     breaker,
     correction,
     copperCable: selectCable(target, 'copper'),
     aluminumCable: selectCable(target, 'aluminum'),
+    startCurrent: startCurrent > 0 ? startCurrent : null,
+    recommendedCurve,
+    curveOverRange: hasStartCurrent && recommendedCurve === null,
   };
+}
+
+// Приближённое практическое правило токовой селективности пары автоматов
+// без использования времятоковых характеристик конкретных производителей.
+export const SELECTIVITY_SAFE_RATIO = 2;
+
+/**
+ * Проверяет токовую селективность вышестоящего автомата по отношению к
+ * нижестоящим: если его номинал не менее чем в SELECTIVITY_SAFE_RATIO раз
+ * больше наибольшего номинала нижестоящих линий — селективность считается
+ * обеспеченной по приближённому правилу. Это упрощённая оценка: полную
+ * проверку выполняйте по времятоковым характеристикам аппаратов конкретного
+ * производителя (зависит также от типов характеристик B/C/D и наличия
+ * выдержки времени у вышестоящего аппарата).
+ */
+export function checkSelectivity(upstreamBreaker, downstreamBreakers = []) {
+  const values = downstreamBreakers.filter((b) => b != null && b > 0);
+  if (!upstreamBreaker || !values.length) return null;
+  const maxDownstream = Math.max(...values);
+  const ratio = upstreamBreaker / maxDownstream;
+  const level = ratio >= SELECTIVITY_SAFE_RATIO ? 'selective' : ratio > 1 ? 'uncertain' : 'not-selective';
+  return { ratio, maxDownstream, level };
 }

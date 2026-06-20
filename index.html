@@ -72,6 +72,32 @@
         </div>
 
         <fieldset class="field-group">
+          <legend>Реальная нагрузка и пусковой ток</legend>
+
+          <div class="field" id="utilization-field">
+            <label for="utilization-factor">Коэффициент использования, Ku</label>
+            <input type="number" id="utilization-factor" inputmode="decimal" step="0.05" min="0.05" max="1" value="1" />
+            <p class="note">
+              Если введённая мощность — установленная (паспортная), а не фактическая средняя нагрузка,
+              укажите Ku &lt; 1, чтобы получить более реалистичную расчётную нагрузку (Pр = Ku · Pуст).
+            </p>
+          </div>
+
+          <div class="field">
+            <label for="load-type">Тип нагрузки</label>
+            <select id="load-type">
+              <option value="general" selected>Общая (без пускового тока)</option>
+              <option value="motor">Электродвигатель (с пусковым током)</option>
+            </select>
+          </div>
+
+          <div class="field" id="start-ratio-field" hidden>
+            <label for="start-ratio">Кратность пускового тока, Кп = Iп / Iном</label>
+            <input type="number" id="start-ratio" inputmode="decimal" step="0.5" min="1" max="12" value="6" />
+          </div>
+        </fieldset>
+
+        <fieldset class="field-group">
           <legend>Условия прокладки кабеля</legend>
 
           <div class="field">
@@ -121,6 +147,7 @@
 
         <div class="recommendation">
           <h3>Рекомендации по защите и кабелю</h3>
+          <p id="res-load-diagram" class="note-line"></p>
           <p id="res-breaker"></p>
           <p id="res-cable"></p>
           <p id="res-correction" class="note-line"></p>
@@ -134,7 +161,10 @@
             базовая прокладка — одиночный кабель открыто в воздухе; способ прокладки и число кабелей рядом
             учитываются приближёнными поправочными коэффициентами). Расчёт соответствует действующей
             редакции ПУЭ (гл. 1.3, 7-е изд.) — таблицы 6-го издания устарели и для текущего проектирования
-            не применяются. Окончательный выбор автоматического выключателя и сечения кабеля выполняйте по
+            не применяются. Коэффициент использования Ku и кратность пускового тока — приближённые
+            величины для оценки реальной (а не только паспортной) нагрузки и подбора характеристики
+            автомата; ток и условия короткого замыкания питающей сети в расчёте не определяются.
+            Окончательный выбор автоматического выключателя и сечения кабеля выполняйте по
             актуальным таблицам ПУЭ/ГОСТ с учётом температуры окружающей среды и реальных условий
             прокладки, либо доверьте расчёт специалисту.
           </p>
@@ -227,6 +257,32 @@
             <label for="node-current-value">Ток, I (А)</label>
             <input type="number" id="node-current-value" inputmode="decimal" step="any" min="0" placeholder="10" />
           </div>
+
+          <fieldset class="field-group">
+            <legend>Реальная нагрузка и пусковой ток</legend>
+
+            <div class="field" id="node-utilization-field">
+              <label for="node-utilization-factor">Коэффициент использования, Ku</label>
+              <input type="number" id="node-utilization-factor" inputmode="decimal" step="0.05" min="0.05" max="1" value="1" />
+              <p class="note">
+                Если введённая мощность — установленная (паспортная), укажите Ku &lt; 1 для более
+                реалистичной расчётной нагрузки узла (Pр = Ku · Pуст).
+              </p>
+            </div>
+
+            <div class="field">
+              <label for="node-load-type">Тип нагрузки</label>
+              <select id="node-load-type">
+                <option value="general" selected>Общая (без пускового тока)</option>
+                <option value="motor">Электродвигатель (с пусковым током)</option>
+              </select>
+            </div>
+
+            <div class="field" id="node-start-ratio-field" hidden>
+              <label for="node-start-ratio">Кратность пускового тока, Кп = Iп / Iном</label>
+              <input type="number" id="node-start-ratio" inputmode="decimal" step="0.5" min="1" max="12" value="6" />
+            </div>
+          </fieldset>
         </div>
 
         <fieldset class="field-group">
@@ -280,6 +336,7 @@
           </div>
 
           <div class="recommendation">
+            <p id="node-res-load-diagram" class="note-line"></p>
             <p id="node-res-breaker"></p>
             <p id="node-res-cable"></p>
             <p id="node-res-voltage-drop" class="note-line"></p>
@@ -290,10 +347,15 @@
 
       <p class="disclaimer">
         Расчёт сети — предварительная оценка для эскизного проектирования: нагрузка каждого узла
-        складывается из его собственной нагрузки и суммарной нагрузки дочерних узлов с учётом
-        коэффициента одновременности, без учёта пусковых токов и реальной диаграммы нагрузки.
-        Окончательный выбор аппаратов защиты, сечений кабелей и проверку селективности выполняйте по
-        полному проекту электроснабжения или доверьте специалисту.
+        складывается из его собственной нагрузки (с учётом коэффициента использования Ku) и суммарной
+        нагрузки дочерних узлов (с учётом коэффициента одновременности Кс); для узлов с типом нагрузки
+        «электродвигатель» дополнительно считается пусковой ток и подбирается устойчивая к нему
+        характеристика автомата (B/C/D); селективность пары автоматов проверяется по приближённому
+        правилу кратности номинальных токов (см. результат узла). Ток и условия короткого замыкания
+        питающей сети, а также отключающая способность аппаратов в этом расчёте не определяются.
+        Окончательный выбор аппаратов защиты, сечений кабелей и полную проверку селективности (по
+        времятоковым характеристикам производителя) выполняйте по полному проекту электроснабжения или
+        доверьте специалисту.
       </p>
     </section>
 
