@@ -13,6 +13,7 @@ import { loadNetworkScheme, saveNetworkScheme } from './networkStorage.js';
 import { loadProjects, getProject, saveProject, deleteProject } from './networkProjects.js';
 import { loadSnapshots, getSnapshot, saveSnapshot, deleteSnapshot } from './schemeSnapshots.js';
 import { diffSchemes, hasDiff } from './schemeDiff.js';
+import { topMostSelectedIds } from './treeSelection.js';
 import { buildSchemeLayout } from './schemeLayout.js';
 import { buildSheet } from './schemeSheet.js';
 import { buildSchemePdf } from './exportPdf.js';
@@ -145,6 +146,11 @@ const netWarningsList = document.getElementById('net-warnings-list');
 const networkSearchInput = document.getElementById('network-search');
 const networkSearchStatus = document.getElementById('network-search-status');
 const nodeAddMenu = document.getElementById('node-add-menu');
+const netMultiActions = document.getElementById('net-multi-actions');
+const netMultiCount = document.getElementById('net-multi-count');
+const multiDuplicateBtn = document.getElementById('multi-duplicate-btn');
+const multiDeleteBtn = document.getElementById('multi-delete-btn');
+const multiClearBtn = document.getElementById('multi-clear-btn');
 const networkPanel = document.getElementById('network-panel');
 const netPanelTitle = document.getElementById('net-panel-title');
 
@@ -322,6 +328,7 @@ function buildDefaultTree() {
 
 let networkTree = null;
 let selectedNodeId = null;
+let selectedNodeIds = new Set();
 let lastCalcMap = null;
 let lastResultTree = null;
 let activeProjectId = null;
@@ -607,6 +614,7 @@ function addChildToNode(parentId, overrides = {}) {
   const child = createNode(overrides);
   parent.children.push(child);
   selectedNodeId = child.id;
+  selectedNodeIds = new Set([child.id]);
   persistNetworkScheme();
   renderTree();
   renderPanel();
@@ -702,6 +710,7 @@ function deleteNode(id) {
   if (isDescendantOrSelf(node, selectedNodeId)) {
     selectedNodeId = parent.id;
   }
+  selectedNodeIds = new Set([selectedNodeId]);
   persistNetworkScheme();
   renderTree();
   renderPanel();
@@ -727,6 +736,7 @@ function duplicateNode(id) {
   const index = parent.children.findIndex((child) => child.id === node.id);
   parent.children.splice(index + 1, 0, clone);
   selectedNodeId = clone.id;
+  selectedNodeIds = new Set([clone.id]);
   persistNetworkScheme();
   renderTree();
   renderPanel();
@@ -744,6 +754,88 @@ function moveNode(nodeId, newParentId) {
   oldParent.children = oldParent.children.filter((child) => child.id !== node.id);
   newParent.children.push(node);
   persistNetworkScheme();
+  renderTree();
+  renderPanel();
+}
+
+// --- Групповые операции над множественным выбором --------------------------
+/** Верхние выбранные узлы (без корня) — те, чей предок не выбран; чтобы не обработать узел дважды. */
+function effectiveSelectedIds() {
+  return topMostSelectedIds(networkTree, selectedNodeIds).filter((id) => id !== networkTree.id);
+}
+
+function deleteSelected() {
+  const ids = effectiveSelectedIds();
+  if (!ids.length) return;
+  const total = ids.reduce((sum, id) => sum + 1 + countDescendants(findNode(networkTree, id)), 0);
+  if (!confirm(`Удалить выбранные узлы (${ids.length}) вместе с поддеревьями — всего ${total}?`)) return;
+  pushUndo();
+  ids.forEach((id) => {
+    const parent = findParentNode(networkTree, id);
+    if (parent) parent.children = parent.children.filter((child) => child.id !== id);
+  });
+  selectedNodeId = findNode(networkTree, selectedNodeId) ? selectedNodeId : networkTree.id;
+  selectedNodeIds = new Set([selectedNodeId]);
+  persistNetworkScheme();
+  renderTree();
+  renderPanel();
+}
+
+function duplicateSelected() {
+  const ids = effectiveSelectedIds();
+  if (!ids.length) return;
+  pushUndo();
+  const newIds = new Set();
+  ids.forEach((id) => {
+    const node = findNode(networkTree, id);
+    const parent = findParentNode(networkTree, id);
+    if (!node || !parent) return;
+    const clone = cloneNodeDeepInner(node);
+    clone.name = `${node.name} (копия)`;
+    const index = parent.children.findIndex((child) => child.id === id);
+    parent.children.splice(index + 1, 0, clone);
+    newIds.add(clone.id);
+  });
+  if (newIds.size) {
+    selectedNodeIds = newIds;
+    selectedNodeId = [...newIds][0];
+  }
+  persistNetworkScheme();
+  renderTree();
+  renderPanel();
+}
+
+/** Переносит группу выбранных узлов под нового родителя (для группового drag-and-drop). */
+function moveNodes(ids, newParentId) {
+  const newParent = findNode(networkTree, newParentId);
+  if (!newParent) return;
+  const valid = ids.filter((id) => {
+    if (id === networkTree.id) return false;
+    const node = findNode(networkTree, id);
+    return node && !isDescendantOrSelf(node, newParentId);
+  });
+  if (!valid.length) return;
+  pushUndo();
+  valid.forEach((id) => {
+    const node = findNode(networkTree, id);
+    const oldParent = findParentNode(networkTree, id);
+    if (!node || !oldParent || oldParent.id === newParentId) return;
+    oldParent.children = oldParent.children.filter((child) => child.id !== id);
+    newParent.children.push(node);
+  });
+  persistNetworkScheme();
+  renderTree();
+  renderPanel();
+}
+
+/** Переключает узел в множественном выборе (Ctrl+клик). */
+function toggleMultiSelect(id) {
+  if (selectedNodeIds.has(id) && selectedNodeIds.size > 1) {
+    selectedNodeIds.delete(id);
+  } else {
+    selectedNodeIds.add(id);
+  }
+  selectedNodeId = id;
   renderTree();
   renderPanel();
 }
@@ -769,6 +861,7 @@ function renderNodeEl(node) {
   card.setAttribute('role', 'button');
   card.setAttribute('tabindex', '0');
   if (node.id === selectedNodeId) card.classList.add('selected');
+  if (selectedNodeIds.size > 1 && selectedNodeIds.has(node.id)) card.classList.add('multi-selected');
 
   const calc = lastCalcMap?.get(node.id);
   if (calc?.error) card.classList.add('has-error');
@@ -798,7 +891,13 @@ function renderNodeEl(node) {
   card.addEventListener('drop', (event) => {
     event.preventDefault();
     card.classList.remove('drag-over');
-    if (draggedNodeId) moveNode(draggedNodeId, node.id);
+    if (!draggedNodeId) return;
+    // Если тащим один из выделенных узлов — переносим всю группу выбранных.
+    if (selectedNodeIds.size > 1 && selectedNodeIds.has(draggedNodeId)) {
+      moveNodes(effectiveSelectedIds(), node.id);
+    } else {
+      moveNode(draggedNodeId, node.id);
+    }
   });
 
   const header = document.createElement('div');
@@ -913,7 +1012,10 @@ function renderNodeEl(node) {
     card.appendChild(balanceBadge);
   }
 
-  card.addEventListener('click', () => selectNode(node.id));
+  card.addEventListener('click', (event) => {
+    if (event.ctrlKey || event.metaKey) toggleMultiSelect(node.id);
+    else selectNode(node.id);
+  });
   card.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -951,6 +1053,27 @@ function renderTree() {
 
   networkTreeEl.appendChild(renderNodeEl(networkTree));
   drawConnectors();
+  renderMultiActions();
+}
+
+/** Панель групповых операций — видна, когда выбрано более одного узла. */
+function renderMultiActions() {
+  // Убираем из выбора узлы, которых уже нет в дереве (после смены схемы/удаления).
+  for (const id of selectedNodeIds) {
+    if (!findNode(networkTree, id)) selectedNodeIds.delete(id);
+  }
+  if (selectedNodeIds.size === 0 && selectedNodeId) selectedNodeIds.add(selectedNodeId);
+
+  if (selectedNodeIds.size > 1) {
+    netMultiActions.hidden = false;
+    const count = effectiveSelectedIds().length;
+    netMultiCount.textContent = `Выбрано узлов: ${selectedNodeIds.size}`;
+    // Если в выборе остались только корень/вложенные — групповые операции недоступны.
+    multiDuplicateBtn.disabled = count === 0;
+    multiDeleteBtn.disabled = count === 0;
+  } else {
+    netMultiActions.hidden = true;
+  }
 }
 
 /**
@@ -1411,6 +1534,7 @@ function renderPanel() {
 
 function selectNode(id) {
   selectedNodeId = id;
+  selectedNodeIds = new Set([id]); // обычный клик сбрасывает множественный выбор
   renderTree();
   renderPanel();
 }
@@ -1508,6 +1632,13 @@ function performUndo() {
 
 undoNetworkBtn.addEventListener('click', performUndo);
 
+multiDuplicateBtn.addEventListener('click', duplicateSelected);
+multiDeleteBtn.addEventListener('click', deleteSelected);
+multiClearBtn.addEventListener('click', () => {
+  selectedNodeIds = new Set([selectedNodeId]);
+  renderTree();
+});
+
 // Клавиатурные сокращения на активной вкладке конструктора (и только вне полей
 // ввода, чтобы не мешать редактированию текста): Delete — удалить выбранный
 // узел, Ctrl/Cmd+D — дублировать его, Ctrl/Cmd+Z — отменить последнее действие.
@@ -1530,9 +1661,13 @@ document.addEventListener('keydown', (event) => {
     }
   } else if (ctrl && key === 'd') {
     event.preventDefault();
-    if (hasSelectedChild) duplicateNode(selectedNodeId);
+    if (selectedNodeIds.size > 1) duplicateSelected();
+    else if (hasSelectedChild) duplicateNode(selectedNodeId);
   } else if (event.key === 'Delete') {
-    if (hasSelectedChild) {
+    if (selectedNodeIds.size > 1) {
+      event.preventDefault();
+      deleteSelected();
+    } else if (hasSelectedChild) {
       event.preventDefault();
       deleteNode(selectedNodeId);
     }
@@ -1790,6 +1925,7 @@ deleteVersionBtn.addEventListener('click', () => {
 const savedNetworkScheme = loadNetworkScheme();
 networkTree = savedNetworkScheme ? savedNetworkScheme.tree : buildDefaultTree();
 selectedNodeId = networkTree.id;
+selectedNodeIds = new Set([networkTree.id]);
 activeProjectId = savedNetworkScheme?.activeProjectId ?? null;
 if (!savedNetworkScheme) persistNetworkScheme();
 updateUndoButtonUI();
