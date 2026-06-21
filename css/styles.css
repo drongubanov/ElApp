@@ -756,6 +756,97 @@ input:focus {
   color: var(--color-text);
 }
 
+/* --- Сводная спецификация оборудования (BOM) ------------------------------- */
+.net-bom {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  margin-bottom: 18px;
+}
+
+.net-bom-summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 12px 16px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.net-bom-summary::-webkit-details-marker {
+  display: none;
+}
+
+.net-bom-summary::before {
+  content: '▸';
+  color: var(--color-text-muted);
+}
+
+.net-bom[open] > .net-bom-summary::before {
+  content: '▾';
+}
+
+.net-bom-summary:hover {
+  color: var(--color-accent);
+}
+
+.net-bom-count {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.net-bom-body {
+  padding: 0 16px 14px;
+}
+
+.net-bom-group-title {
+  margin: 8px 0 6px;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.net-bom-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+}
+
+.net-bom-table th,
+.net-bom-table td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.net-bom-table th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.net-bom-table td.net-bom-qty {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.net-bom-empty {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  margin: 8px 0 0;
+}
+
+.net-bom-note {
+  color: var(--color-accent);
+  font-size: 0.85rem;
+  margin: 4px 0 0;
+}
+
 /* --- Сравнение версий схемы ------------------------------------------------ */
 .net-diff {
   margin-top: 12px;

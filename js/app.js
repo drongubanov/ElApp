@@ -21,6 +21,7 @@ import { buildSchemePdf } from './exportPdf.js';
 import { buildDxf } from './exportDxf.js';
 import { buildSpecCsv } from './schemeSpec.js';
 import { buildSpecSheet } from './specSheet.js';
+import { buildBom, buildBomCsv, breakerSpecLabel, cableSpecLabel } from './schemeBom.js';
 import { collectSchemeWarnings, VOLTAGE_DROP_LIMIT_PERCENT } from './schemeWarnings.js';
 import { NODE_TEMPLATES } from './nodeTemplates.js';
 import { loadHistory, saveHistoryEntry, deleteHistoryEntry, clearHistory } from './history.js';
@@ -130,6 +131,7 @@ const exportPdfBtn = document.getElementById('export-pdf-btn');
 const exportDxfBtn = document.getElementById('export-dxf-btn');
 const exportSpecBtn = document.getElementById('export-spec-btn');
 const exportSpecPdfBtn = document.getElementById('export-spec-pdf-btn');
+const exportBomBtn = document.getElementById('export-bom-btn');
 const resetNetworkBtn = document.getElementById('reset-network-btn');
 const networkProjectSelect = document.getElementById('network-project-select');
 const openProjectBtn = document.getElementById('open-project-btn');
@@ -151,6 +153,9 @@ const networkErrorMessage = document.getElementById('network-error-message');
 const networkWarnings = document.getElementById('network-warnings');
 const netWarningsCount = document.getElementById('net-warnings-count');
 const netWarningsList = document.getElementById('net-warnings-list');
+const networkBom = document.getElementById('network-bom');
+const netBomCount = document.getElementById('net-bom-count');
+const netBomBody = document.getElementById('net-bom-body');
 const networkSearchInput = document.getElementById('network-search');
 const networkSearchStatus = document.getElementById('network-search-status');
 const nodeAddMenu = document.getElementById('node-add-menu');
@@ -1239,6 +1244,77 @@ function renderWarnings() {
   });
 }
 
+/**
+ * Сводная спецификация оборудования: группирует автоматы и кабели по типам
+ * с количеством/суммарной длиной (см. js/schemeBom.js). Показывается только
+ * после расчёта, как и панель проверок.
+ */
+function renderBom() {
+  if (!lastResultTree) {
+    networkBom.hidden = true;
+    return;
+  }
+  networkBom.hidden = false;
+  netBomBody.innerHTML = '';
+
+  const bom = buildBom(networkTree);
+  const totalItems = bom.breakers.length + bom.cables.length;
+  netBomCount.textContent = totalItems ? `(${totalItems})` : '';
+
+  if (!totalItems) {
+    const empty = document.createElement('p');
+    empty.className = 'net-bom-empty';
+    empty.textContent = 'Нет узлов с подобранным оборудованием.';
+    netBomBody.appendChild(empty);
+    return;
+  }
+
+  const addSection = (title, rows, renderRow) => {
+    if (!rows.length) return;
+    const heading = document.createElement('p');
+    heading.className = 'net-bom-group-title';
+    heading.textContent = title;
+    netBomBody.appendChild(heading);
+
+    const table = document.createElement('table');
+    table.className = 'net-bom-table';
+    const tbody = document.createElement('tbody');
+    rows.forEach((row) => tbody.appendChild(renderRow(row)));
+    table.appendChild(tbody);
+    netBomBody.appendChild(table);
+  };
+
+  addSection('Автоматические выключатели', bom.breakers, (b) => {
+    const tr = document.createElement('tr');
+    const nameTd = document.createElement('td');
+    nameTd.textContent = breakerSpecLabel(b);
+    const qtyTd = document.createElement('td');
+    qtyTd.className = 'net-bom-qty';
+    qtyTd.textContent = `${b.count} шт.`;
+    tr.append(nameTd, qtyTd);
+    return tr;
+  });
+
+  addSection('Кабели', bom.cables, (c) => {
+    const tr = document.createElement('tr');
+    const nameTd = document.createElement('td');
+    nameTd.textContent = cableSpecLabel(c);
+    const qtyTd = document.createElement('td');
+    qtyTd.className = 'net-bom-qty';
+    qtyTd.textContent = `${c.totalLength} м (${c.count} ${c.count === 1 ? 'линия' : 'линии(й)'})`;
+    tr.append(nameTd, qtyTd);
+    return tr;
+  });
+
+  const unresolved = bom.unresolvedBreakers + bom.unresolvedCables;
+  if (unresolved) {
+    const note = document.createElement('p');
+    note.className = 'net-bom-note';
+    note.textContent = `Для ${unresolved} ${unresolved === 1 ? 'линии' : 'линий'} не удалось подобрать оборудование — см. панель проверок.`;
+    netBomBody.appendChild(note);
+  }
+}
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /**
@@ -2060,6 +2136,7 @@ calcNetworkBtn.addEventListener('click', () => {
   renderTree();
   renderPanel();
   renderWarnings();
+  renderBom();
 });
 
 networkSearchInput.addEventListener('input', () => {
@@ -2089,6 +2166,7 @@ function performUndo() {
   renderTree();
   renderPanel();
   renderWarnings();
+  renderBom();
   renderProjectList();
 }
 
@@ -2251,6 +2329,17 @@ exportSpecPdfBtn.addEventListener('click', () => {
   }
 });
 
+exportBomBtn.addEventListener('click', () => {
+  if (!networkTree) return;
+  try {
+    const csv = buildBomCsv(networkTree);
+    downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `${sanitizeFileName(networkTree.name)} — спецификация.csv`);
+    networkErrorMessage.textContent = '';
+  } catch (err) {
+    networkErrorMessage.textContent = `Не удалось построить спецификацию: ${err.message}`;
+  }
+});
+
 const PROJECT_FILE_FORMAT = 'elapp-network-project';
 
 exportProjectBtn.addEventListener('click', () => {
@@ -2292,6 +2381,7 @@ importProjectInput.addEventListener('change', () => {
     renderTree();
     renderPanel();
     renderWarnings();
+    renderBom();
     renderProjectList();
   };
   reader.onerror = () => {
@@ -2314,6 +2404,7 @@ resetNetworkBtn.addEventListener('click', () => {
   renderTree();
   renderPanel();
   renderWarnings();
+  renderBom();
   renderProjectList();
 });
 
@@ -2335,6 +2426,7 @@ openProjectBtn.addEventListener('click', () => {
   renderTree();
   renderPanel();
   renderWarnings();
+  renderBom();
   renderProjectList();
 });
 

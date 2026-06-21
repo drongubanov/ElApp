@@ -298,6 +298,9 @@
             <button type="button" id="export-spec-pdf-btn" role="menuitem" title="Сохранить оформленную ведомость линий сети в PDF (со штампом, для проектной документации)">
               Ведомость в PDF
             </button>
+            <button type="button" id="export-bom-btn" role="menuitem" title="Сохранить сводную спецификацию оборудования (автоматы и кабели по типам) в CSV (Excel)">
+              Спецификация оборудования в CSV
+            </button>
           </div>
         </div>
         <button type="button" id="reset-network-btn" class="btn-secondary" title="Удалить все узлы и параметры и начать сначала">
@@ -310,6 +313,13 @@
         <h3 class="net-warnings-title">Сводка проверок <span class="net-warnings-count" id="net-warnings-count"></span></h3>
         <ul class="net-warnings-list" id="net-warnings-list"></ul>
       </section>
+
+      <details class="net-bom" id="network-bom" hidden>
+        <summary class="net-bom-summary">
+          Спецификация оборудования <span class="net-bom-count" id="net-bom-count"></span>
+        </summary>
+        <div class="net-bom-body" id="net-bom-body"></div>
+      </details>
 
       <div class="net-search">
         <input type="search" id="network-search" class="net-search-input"
