@@ -192,7 +192,18 @@ const networkPanel = document.getElementById('network-panel');
 const netPanelSection = document.getElementById('net-panel-section');
 const netPanelSummaryName = document.getElementById('net-panel-summary-name');
 const netPanelTitle = document.getElementById('net-panel-title');
+const netPanelCollapseBtn = document.getElementById('net-panel-collapse-btn');
 const netBreadcrumb = document.getElementById('net-breadcrumb');
+
+// Кнопка «Свернуть» в липком заголовке панели — сворачивает секцию параметров
+// прямо из глубины длинной формы и возвращает к её заголовку, чтобы не
+// прокручивать вручную.
+if (netPanelCollapseBtn && netPanelSection) {
+  netPanelCollapseBtn.addEventListener('click', () => {
+    netPanelSection.open = false;
+    netPanelSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+}
 
 const nodeNameInput = document.getElementById('node-name');
 const nodeHasOwnLoadInput = document.getElementById('node-has-own-load');
