@@ -8,7 +8,7 @@ import {
   SELECTIVITY_SAFE_RATIO,
 } from './tables.js';
 import { calculateShortCircuit, checkDisconnectionByCurve } from './shortCircuit.js';
-import { calculateTree, annotateShortCircuit, annotateVoltageDrop, DEFAULT_START_CURRENT_RATIO } from './network.js';
+import { calculateTree, annotateShortCircuit, annotateVoltageDrop, DEFAULT_START_CURRENT_RATIO, EARTHING_SYSTEMS } from './network.js';
 import { loadNetworkScheme, saveNetworkScheme } from './networkStorage.js';
 import { loadProjects, getProject, saveProject, deleteProject } from './networkProjects.js';
 import { loadSnapshots, getSnapshot, saveSnapshot, deleteSnapshot } from './schemeSnapshots.js';
@@ -185,6 +185,7 @@ const nodeStartRatioInput = document.getElementById('node-start-ratio');
 const nodeTransformerField = document.getElementById('node-transformer-field');
 const nodeTransformerPowerInput = document.getElementById('node-transformer-power');
 const nodeTransformerUkInput = document.getElementById('node-transformer-uk');
+const nodeEarthingSystemSelect = document.getElementById('node-earthing-system');
 const nodeCableLegend = document.getElementById('node-cable-legend');
 const nodeInstallationSelect = document.getElementById('node-installation');
 const nodeCableCountInput = document.getElementById('node-cable-count');
@@ -299,6 +300,7 @@ function createNode(overrides = {}) {
     startCurrentRatio: DEFAULT_START_CURRENT_RATIO,
     transformerPowerKva: null,
     transformerUkPercent: null,
+    earthingSystem: 'TN-C-S',
     collapsed: false,
     children: [],
     ...overrides,
@@ -1735,13 +1737,20 @@ function renderNodeResult(node) {
   }
 
   if (calc.shortCircuit) {
-    const { i3, i1, curve, disconnection, thermalCheck } = calc.shortCircuit;
+    const { i3, i1, curve, earthingSystem, disconnection, thermalCheck } = calc.shortCircuit;
     let note =
-      `Приближённая оценка: Iкз(3) ≈ ${formatShortCircuitCurrent(i3)}, Iкз(1) ≈ ${formatShortCircuitCurrent(i1)} ` +
-      '(сопротивление кабелей выше по дереву накоплено от трансформатора; индуктивные составляющие и ' +
-      'сопротивление выше трансформатора не учитываются).';
+      `Система заземления ${earthingSystem}. Приближённая оценка: Iкз(3) ≈ ${formatShortCircuitCurrent(i3)}, ` +
+      `Iкз(1) ≈ ${formatShortCircuitCurrent(i1)} по петле «фаза–защитный проводник» (сопротивление кабелей выше ` +
+      'по дереву накоплено от трансформатора; индуктивные составляющие и сопротивление выше трансформатора не ' +
+      'учитываются).';
     let warn = false;
-    if (disconnection) {
+    if (disconnection?.requiresRcd) {
+      note +=
+        ' ⚠ В системе TT ток однофазного замыкания на землю ограничен сопротивлением заземлителей и ' +
+        'максимально-токовой защитой за нормативное время не отключается — автоматическое отключение должно ' +
+        'обеспечиваться УЗО (RCD).';
+      warn = true;
+    } else if (disconnection) {
       note += disconnection.ok
         ? ` ✓ При характеристике ${curve} отключение заведомо быстрее нормативных 0,4 с / 0,2 с.`
         : ` ✗ При характеристике ${curve} быстрое отключение не гарантировано — см. мини-калькулятор КЗ на ` +
@@ -1807,6 +1816,7 @@ function renderPanel() {
   if (isRoot) {
     nodeTransformerPowerInput.value = node.transformerPowerKva || '';
     nodeTransformerUkInput.value = node.transformerUkPercent || '';
+    nodeEarthingSystemSelect.value = node.earthingSystem ?? 'TN-C-S';
   }
 
   updateNodeLoadFieldsUI();
@@ -1846,6 +1856,7 @@ function onPanelChange() {
   if (node.id === networkTree.id) {
     node.transformerPowerKva = Number(nodeTransformerPowerInput.value) || null;
     node.transformerUkPercent = Number(nodeTransformerUkInput.value) || null;
+    node.earthingSystem = nodeEarthingSystemSelect.value;
   }
 
   netPanelTitle.textContent = node.name;
@@ -1867,7 +1878,7 @@ nodeNetworkTypeSelect.addEventListener('change', () => {
   nodePowerValueInput, nodePowerUnitSelect, nodeCurrentValueInput, nodeInstallationSelect,
   nodeCableCountInput, nodeAmbientTempInput, nodeInsulationSelect, nodeCableLengthInput, nodeKcInput,
   nodeUtilizationInput, nodeLoadTypeSelect, nodeStartRatioInput,
-  nodeTransformerPowerInput, nodeTransformerUkInput,
+  nodeTransformerPowerInput, nodeTransformerUkInput, nodeEarthingSystemSelect,
   ...document.querySelectorAll('input[name="node-known"]'),
 ].forEach((el) => {
   el.addEventListener('input', onPanelChange);

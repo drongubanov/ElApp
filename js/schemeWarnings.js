@@ -63,7 +63,17 @@ export function collectSchemeWarnings(calcTree) {
         });
       }
 
-      if (calc.shortCircuit?.disconnection && !calc.shortCircuit.disconnection.ok) {
+      if (calc.shortCircuit?.disconnection?.requiresRcd) {
+        warnings.push({
+          nodeId: calc.id,
+          nodeName: calc.name,
+          severity: 'warn',
+          category: 'short-circuit',
+          message:
+            'Система TT: автоматическое отключение питания должно обеспечиваться УЗО (RCD) — ' +
+            'максимально-токовая защита ток однофазного замыкания на землю за нормативное время не отключит.',
+        });
+      } else if (calc.shortCircuit?.disconnection && !calc.shortCircuit.disconnection.ok) {
         warnings.push({
           nodeId: calc.id,
           nodeName: calc.name,

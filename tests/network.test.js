@@ -520,6 +520,64 @@ test('annotateShortCircuit: термостойкость — при негара
   assert.ok(Math.abs(thermalCheck.minSection - (i3 * Math.sqrt(5)) / 115) < 1e-6);
 });
 
+test('annotateShortCircuit: без указания системы заземления принимается TN-C-S', () => {
+  const tree = baseNode({
+    transformerPowerKva: 1000,
+    transformerUkPercent: 4,
+    children: [{ ...baseNode(), id: 'a', hasOwnLoad: true, known: 'power', knownValue: 2000, cableLength: 2, children: [] }],
+  });
+  const calc = calculateTree(tree);
+  annotateShortCircuit(tree, calc);
+  assert.equal(calc.children[0].shortCircuit.earthingSystem, 'TN-C-S');
+});
+
+test('annotateShortCircuit: система TN-S — отключение по максимально-токовой защите (без требования УЗО)', () => {
+  const tree = baseNode({
+    transformerPowerKva: 1000,
+    transformerUkPercent: 4,
+    earthingSystem: 'TN-S',
+    children: [{ ...baseNode(), id: 'a', hasOwnLoad: true, known: 'power', knownValue: 2000, cableLength: 2, children: [] }],
+  });
+  const calc = calculateTree(tree);
+  annotateShortCircuit(tree, calc);
+  const d = calc.children[0].shortCircuit.disconnection;
+  assert.equal(d.requiresRcd, undefined);
+  assert.equal(typeof d.ok, 'boolean');
+});
+
+test('annotateShortCircuit: система TT — отключение требует УЗО (requiresRcd), не максимально-токовой защиты', () => {
+  const tree = baseNode({
+    transformerPowerKva: 1000,
+    transformerUkPercent: 4,
+    earthingSystem: 'TT',
+    children: [{ ...baseNode(), id: 'a', hasOwnLoad: true, known: 'power', knownValue: 2000, cableLength: 2, children: [] }],
+  });
+  const calc = calculateTree(tree);
+  annotateShortCircuit(tree, calc);
+  const sc = calc.children[0].shortCircuit;
+  assert.equal(sc.earthingSystem, 'TT');
+  assert.equal(sc.disconnection.requiresRcd, true);
+  assert.equal(sc.disconnection.ok, undefined);
+});
+
+test('annotateShortCircuit: петля «фаза–PE» учитывает уменьшенное сечение PE при сечении фазы > 16 мм²', () => {
+  // Большой ток (200 А) → сечение фазы > 16 мм², а PE по ПУЭ-7 табл. 1.7.5 меньше
+  // фазного, поэтому сопротивление защитного проводника выше и Iкз(1) по петле
+  // «фаза–PE» ниже прежней оценки Uф/(Zт + 2·Rфаз).
+  const tree = baseNode({
+    transformerPowerKva: 1000,
+    transformerUkPercent: 4,
+    children: [{ ...baseNode(), id: 'a', hasOwnLoad: true, known: 'current', knownValue: 200, cableLength: 20, children: [] }],
+  });
+  const calc = calculateTree(tree);
+  annotateShortCircuit(tree, calc);
+  const { resistance, peResistance, i1, zT } = calc.children[0].shortCircuit;
+  assert.ok(peResistance > resistance, 'сопротивление PE при уменьшенном сечении больше фазного');
+  const phaseVoltage = 380 / Math.sqrt(3);
+  assert.ok(Math.abs(i1 - phaseVoltage / (zT + resistance + peResistance)) < 1e-9);
+  assert.ok(i1 < phaseVoltage / (zT + 2 * resistance));
+});
+
 test('annotateVoltageDrop: суммирует потерю напряжения по сегментам от точки ввода до узла', () => {
   const tree = baseNode({
     cableLength: 5,

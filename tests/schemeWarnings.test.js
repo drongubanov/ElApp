@@ -106,6 +106,22 @@ test('collectSchemeWarnings: негарантированное отключен
   assert.ok(sc, 'ожидается замечание о времени отключения при КЗ');
 });
 
+test('collectSchemeWarnings: система TT даёт замечание о необходимости УЗО (RCD)', () => {
+  const tree = baseNode({
+    transformerPowerKva: 1000,
+    transformerUkPercent: 4,
+    earthingSystem: 'TT',
+    children: [
+      { ...baseNode(), id: 'a', name: 'Розетка', hasOwnLoad: true, known: 'power', knownValue: 2000, cableLength: 2, children: [] },
+    ],
+  });
+  const calc = annotateShortCircuit(tree, calculateTree(tree));
+  const warnings = collectSchemeWarnings(calc);
+  const rcd = warnings.find((w) => w.category === 'short-circuit' && w.nodeId === 'a');
+  assert.ok(rcd, 'ожидается замечание о необходимости УЗО в системе TT');
+  assert.match(rcd.message, /УЗО|RCD/);
+});
+
 test('collectSchemeWarnings: недостаточная термостойкость кабеля к нагреву при КЗ попадает в сводку', () => {
   // Малая нагрузка рядом с мощным трансформатором: сечение по току (1.5 мм²)
   // не выдерживает тепловой импульс короткого замыкания такой силы.
