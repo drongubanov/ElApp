@@ -776,6 +776,21 @@ input:focus {
   outline: none;
 }
 
+/* Подсветка пункта при переходе с карточки (клик по бейджу-точке). */
+@keyframes net-warning-flash {
+  0%,
+  35% {
+    box-shadow: 0 0 0 2px var(--color-accent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.net-warning-item.flash {
+  animation: net-warning-flash 1.4s ease-out;
+}
+
 .net-warning-icon {
   flex-shrink: 0;
   font-weight: 700;
@@ -1345,6 +1360,7 @@ input:focus {
 }
 
 .net-node {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1360,6 +1376,40 @@ input:focus {
   text-align: center;
   cursor: pointer;
   transition: border-color 0.15s, transform 0.1s;
+}
+
+/* Бейдж проверок — цветная точка в углу карточки. Кликабельна: ведёт к
+   соответствующему замечанию в сводной панели проверок. Цвет — по серьёзности
+   (ошибка расчёта красная, прочие замечания акцентные). При нескольких
+   замечаниях внутри точки показывается их количество. */
+.net-node-check-dot {
+  position: absolute;
+  top: -7px;
+  left: -7px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-surface);
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #1e293b;
+  font-size: 0.64rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.net-node-check-dot[data-severity='error'] {
+  background: var(--color-danger);
+}
+
+.net-node-check-dot:hover,
+.net-node-check-dot:focus-visible {
+  filter: brightness(1.12);
+  outline: none;
 }
 
 .net-node:hover {
@@ -1513,10 +1563,6 @@ input:focus {
 
 .net-node-badge.warn {
   color: var(--color-danger);
-}
-
-.net-node-badge.caution {
-  color: var(--color-accent);
 }
 
 /* Панель параметров узла теперь живёт внутри сворачиваемой секции
