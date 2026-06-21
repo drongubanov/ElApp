@@ -372,7 +372,12 @@
             <input type="number" id="node-pf" inputmode="decimal" step="0.01" min="0.01" max="1" value="1" />
           </div>
 
-          <div class="field">
+          <label class="net-checkbox">
+            <input type="checkbox" id="node-load-mode-group" />
+            Задавать нагрузку группой приёмников (метод Ки/Кр)
+          </label>
+
+          <div class="field" id="node-known-field">
             <span class="field-label">Известная величина</span>
             <div class="radio-group">
               <label><input type="radio" name="node-known" id="node-known-power" value="power" checked /> Мощность</label>
@@ -396,7 +401,7 @@
             <input type="number" id="node-current-value" inputmode="decimal" step="any" min="0" placeholder="10" />
           </div>
 
-          <fieldset class="field-group">
+          <fieldset class="field-group" id="node-realload-fieldset">
             <legend>Реальная нагрузка и пусковой ток</legend>
 
             <div class="field" id="node-utilization-field">
@@ -420,6 +425,18 @@
               <label for="node-start-ratio">Кратность пускового тока, Кп = Iп / Iном</label>
               <input type="number" id="node-start-ratio" inputmode="decimal" step="0.5" min="1" max="12" value="6" />
             </div>
+          </fieldset>
+
+          <fieldset class="field-group" id="node-group-fields" hidden>
+            <legend>Группа приёмников (метод Ки/Кр)</legend>
+            <p class="note">
+              Эффективное число приёмников nэ и групповой коэффициент использования Ки.гр считаются по
+              точным формулам; расчётная нагрузка группы Pр оценивается по прозрачной приближённой
+              формуле Кс.гр = Ки.гр + (1 − Ки.гр)/√nэ, а не по табличным значениям Кр(nэ, Ки.гр) из
+              РТМ 36.18.32.4-92 / СП 256 — для точного проектирования используйте табличный метод.
+            </p>
+            <div id="node-receivers-list"></div>
+            <button type="button" class="btn-secondary" id="node-add-receiver-btn">+ Приёмник</button>
           </fieldset>
         </div>
 

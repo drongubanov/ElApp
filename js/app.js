@@ -172,11 +172,17 @@ const nodeNetworkTypeSelect = document.getElementById('node-network-type');
 const nodeVoltageInput = document.getElementById('node-voltage');
 const nodePfField = document.getElementById('node-pf-field');
 const nodePfInput = document.getElementById('node-pf');
+const nodeLoadModeGroupInput = document.getElementById('node-load-mode-group');
+const nodeKnownField = document.getElementById('node-known-field');
 const nodePowerField = document.getElementById('node-power-field');
 const nodePowerValueInput = document.getElementById('node-power-value');
 const nodePowerUnitSelect = document.getElementById('node-power-unit');
 const nodeCurrentField = document.getElementById('node-current-field');
 const nodeCurrentValueInput = document.getElementById('node-current-value');
+const nodeRealLoadFieldset = document.getElementById('node-realload-fieldset');
+const nodeGroupFields = document.getElementById('node-group-fields');
+const nodeReceiversList = document.getElementById('node-receivers-list');
+const nodeAddReceiverBtn = document.getElementById('node-add-receiver-btn');
 const nodeUtilizationField = document.getElementById('node-utilization-field');
 const nodeUtilizationInput = document.getElementById('node-utilization-factor');
 const nodeLoadTypeSelect = document.getElementById('node-load-type');
@@ -293,6 +299,8 @@ function createNode(overrides = {}) {
     hasOwnLoad: true,
     known: 'power',
     knownValue: 1000,
+    loadInputMode: 'direct',
+    receivers: [],
     installationMethod: 'air',
     cableCount: 1,
     cableLength: 0,
@@ -1519,11 +1527,83 @@ function updateNodeLoadFieldsUI() {
 
 function updateNodeKnownFieldsUI() {
   const known = document.querySelector('input[name="node-known"]:checked').value;
-  nodePowerField.hidden = known !== 'power';
-  nodeCurrentField.hidden = known !== 'current';
+  const isGroup = nodeLoadModeGroupInput.checked;
+  nodeKnownField.hidden = isGroup;
+  nodePowerField.hidden = isGroup || known !== 'power';
+  nodeCurrentField.hidden = isGroup || known !== 'current';
   nodePfField.hidden = nodeNetworkTypeSelect.value === NETWORK_TYPES.DC;
   nodeVoltageInput.placeholder = VOLTAGE_PLACEHOLDERS[nodeNetworkTypeSelect.value] ?? '';
-  nodeUtilizationField.hidden = known !== 'power';
+  nodeUtilizationField.hidden = isGroup || known !== 'power';
+  nodeRealLoadFieldset.hidden = isGroup;
+  nodeGroupFields.hidden = !isGroup;
+}
+
+/**
+ * Перестраивает редактор списка приёмников группы (метод Ки/Кр): для каждого
+ * приёмника — поля установленной мощности (кВт) и коэффициента использования
+ * Ки, кнопка удаления. node.receivers хранит мощность в Вт (как knownValue), а
+ * поле ввода — в кВт, по той же логике, что node-power-value/node-power-unit.
+ */
+function renderReceiversList(node) {
+  nodeReceiversList.replaceChildren();
+  const receivers = Array.isArray(node.receivers) ? node.receivers : [];
+  receivers.forEach((receiver, index) => {
+    const row = document.createElement('div');
+    row.className = 'receiver-row';
+
+    const powerField = document.createElement('div');
+    powerField.className = 'field';
+    const powerLabel = document.createElement('label');
+    powerLabel.textContent = `Приёмник ${index + 1}: Pн, кВт`;
+    const powerInput = document.createElement('input');
+    powerInput.type = 'number';
+    powerInput.inputMode = 'decimal';
+    powerInput.step = 'any';
+    powerInput.min = '0';
+    powerInput.value = receiver.installedP ? receiver.installedP / 1000 : '';
+    powerInput.addEventListener('input', () => {
+      receiver.installedP = (Number(powerInput.value) || 0) * 1000;
+      onReceiversChange();
+    });
+    powerField.append(powerLabel, powerInput);
+
+    const kuField = document.createElement('div');
+    kuField.className = 'field';
+    const kuLabel = document.createElement('label');
+    kuLabel.textContent = 'Ки';
+    const kuInput = document.createElement('input');
+    kuInput.type = 'number';
+    kuInput.inputMode = 'decimal';
+    kuInput.step = '0.05';
+    kuInput.min = '0.01';
+    kuInput.max = '1';
+    kuInput.value = receiver.ku ?? '';
+    kuInput.addEventListener('input', () => {
+      receiver.ku = Number(kuInput.value) || 0;
+      onReceiversChange();
+    });
+    kuField.append(kuLabel, kuInput);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'receiver-remove-btn';
+    removeBtn.title = 'Удалить приёмник';
+    removeBtn.setAttribute('aria-label', 'Удалить приёмник');
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', () => {
+      node.receivers.splice(index, 1);
+      renderReceiversList(node);
+      onReceiversChange();
+    });
+
+    row.append(powerField, kuField, removeBtn);
+    nodeReceiversList.appendChild(row);
+  });
+}
+
+function onReceiversChange() {
+  persistNetworkScheme();
+  renderTree();
 }
 
 function updateNodeLoadTypeUI() {
@@ -1590,7 +1670,7 @@ function renderNodeResult(node) {
   }
 
   nodeResultEl.hidden = false;
-  const { result, protection, voltageDrop, sumOfChildBreakers, maxOfChildBreakers, selectivity, installed, startCurrent } = calc;
+  const { result, protection, voltageDrop, sumOfChildBreakers, maxOfChildBreakers, selectivity, installed, startCurrent, groupDemand } = calc;
   nodeResP.textContent = formatPower(result.P);
   nodeResS.textContent = formatApparentPower(result.S);
   nodeResQ.textContent = formatReactivePower(result.Q);
@@ -1598,7 +1678,17 @@ function renderNodeResult(node) {
 
   nodeResDetails.replaceChildren();
 
-  if (installed && node.utilizationFactor < 1) {
+  if (node.loadInputMode === 'group' && groupDemand) {
+    addResultItem(nodeResDetails, {
+      label: 'Групповая нагрузка (метод Ки/Кр)',
+      value: `Pр ≈ ${formatPower(groupDemand.calculatedP)}`,
+      note:
+        `${groupDemand.count} приёмников, ΣPн = ${formatPower(groupDemand.installedTotal)}, ` +
+        `Pср = ${formatPower(groupDemand.averageP)}, nэ ≈ ${groupDemand.nEffective.toFixed(2)}, ` +
+        `Ки.гр ≈ ${groupDemand.groupKu.toFixed(2)}, Кс.гр ≈ ${groupDemand.supplyFactor.toFixed(2)} ` +
+        '(приближённая формула, не табличный Кр из РТМ 36.18.32.4-92 / СП 256).',
+    });
+  } else if (installed && node.utilizationFactor < 1) {
     addResultItem(nodeResDetails, {
       label: 'Расчётная нагрузка',
       value: formatPower(calc.ownP),
@@ -1826,6 +1916,8 @@ function renderPanel() {
   } else {
     nodeCurrentValueInput.value = node.knownValue || '';
   }
+  nodeLoadModeGroupInput.checked = node.loadInputMode === 'group';
+  renderReceiversList(node);
   nodeInstallationSelect.value = node.installationMethod;
   nodeCableCountInput.value = node.cableCount;
   nodeAmbientTempInput.value = node.ambientTemp ?? 25;
@@ -1878,6 +1970,7 @@ function onPanelChange() {
   node.knownValue = node.known === 'power'
     ? Number(nodePowerValueInput.value) * Number(nodePowerUnitSelect.value)
     : Number(nodeCurrentValueInput.value);
+  node.loadInputMode = nodeLoadModeGroupInput.checked ? 'group' : 'direct';
   node.installationMethod = nodeInstallationSelect.value;
   node.cableCount = Number(nodeCableCountInput.value) || 1;
   node.ambientTemp = nodeAmbientTempInput.value === '' ? 25 : Number(nodeAmbientTempInput.value);
@@ -1914,7 +2007,7 @@ nodeNetworkTypeSelect.addEventListener('change', () => {
 });
 
 [
-  nodeNameInput, nodeHasOwnLoadInput, nodeVoltageInput, nodePfInput,
+  nodeNameInput, nodeHasOwnLoadInput, nodeVoltageInput, nodePfInput, nodeLoadModeGroupInput,
   nodePowerValueInput, nodePowerUnitSelect, nodeCurrentValueInput, nodeInstallationSelect,
   nodeCableCountInput, nodeAmbientTempInput, nodeInsulationSelect, nodeCableLengthInput, nodeKcInput,
   nodePhaseL1Input, nodePhaseL2Input, nodePhaseL3Input,
@@ -1924,6 +2017,15 @@ nodeNetworkTypeSelect.addEventListener('change', () => {
 ].forEach((el) => {
   el.addEventListener('input', onPanelChange);
   el.addEventListener('change', onPanelChange);
+});
+
+nodeAddReceiverBtn.addEventListener('click', () => {
+  const node = findNode(networkTree, selectedNodeId);
+  if (!node) return;
+  if (!Array.isArray(node.receivers)) node.receivers = [];
+  node.receivers.push({ installedP: 0, ku: 1 });
+  renderReceiversList(node);
+  persistNetworkScheme();
 });
 
 calcNetworkBtn.addEventListener('click', () => {
