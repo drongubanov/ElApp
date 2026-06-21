@@ -121,6 +121,8 @@ const heatmapLegend = document.getElementById('heatmap-legend');
 const heatmapLegendMin = document.getElementById('heatmap-legend-min');
 const heatmapLegendMax = document.getElementById('heatmap-legend-max');
 const heatmapLegendBar = document.getElementById('heatmap-legend-bar');
+const netProjectsSection = document.getElementById('net-projects-section');
+const netVersionsSection = document.getElementById('net-versions-section');
 const exportMenuBtn = document.getElementById('export-menu-btn');
 const exportDropdown = document.getElementById('export-dropdown');
 const exportPdfBtn = document.getElementById('export-pdf-btn');
@@ -2195,6 +2197,31 @@ deleteVersionBtn.addEventListener('click', () => {
   networkDiff.hidden = true;
   renderVersionList();
 });
+
+// --- Сворачиваемые секции «Проекты сети» и «Версии и сравнение» -------------
+// По умолчанию обе свёрнуты, чтобы не отвлекать от дерева; состояние каждой
+// запоминается в localStorage, чтобы постоянно открытая у конкретного
+// пользователя секция не сворачивалась при каждой перезагрузке.
+const NET_SECTIONS_KEY = 'elapp.netSections.v1';
+
+function loadNetSectionsState() {
+  try {
+    return JSON.parse(localStorage.getItem(NET_SECTIONS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function persistNetSectionsState() {
+  const state = { projects: netProjectsSection.open, versions: netVersionsSection.open };
+  localStorage.setItem(NET_SECTIONS_KEY, JSON.stringify(state));
+}
+
+const netSectionsState = loadNetSectionsState();
+netProjectsSection.open = Boolean(netSectionsState.projects);
+netVersionsSection.open = Boolean(netSectionsState.versions);
+netProjectsSection.addEventListener('toggle', persistNetSectionsState);
+netVersionsSection.addEventListener('toggle', persistNetSectionsState);
 
 const savedNetworkScheme = loadNetworkScheme();
 networkTree = savedNetworkScheme ? savedNetworkScheme.tree : buildDefaultTree();

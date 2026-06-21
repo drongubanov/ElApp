@@ -199,8 +199,9 @@
         автоматы и кабели для всех линий дерева.
       </p>
 
-      <fieldset class="field-group net-projects">
-        <legend>Проекты сети</legend>
+      <details class="net-section" id="net-projects-section">
+        <summary class="net-section-summary">Проекты сети</summary>
+        <div class="net-section-body">
         <p class="note">
           Сохраняйте текущую схему как именованный проект, чтобы вернуться к ней позже. Сохранённые
           проекты хранятся в этом браузере и не пропадают при сбросе схемы или создании новой.
@@ -235,10 +236,12 @@
         </div>
 
         <p id="network-project-status" class="note-line"></p>
-      </fieldset>
+        </div>
+      </details>
 
-      <fieldset class="field-group net-versions">
-        <legend>Версии и сравнение</legend>
+      <details class="net-section" id="net-versions-section">
+        <summary class="net-section-summary">Версии и сравнение</summary>
+        <div class="net-section-body">
         <p class="note">
           Сохраняйте снимки (версии) текущей схемы и сравнивайте любой из них с текущей схемой —
           конструктор покажет, что изменилось в мощности, токе и номиналах автоматов по каждому узлу,
@@ -264,7 +267,8 @@
           <h4 class="net-diff-title" id="network-diff-title"></h4>
           <ul class="net-diff-list" id="network-diff-list"></ul>
         </div>
-      </fieldset>
+        </div>
+      </details>
 
       <div class="net-actions">
         <button type="button" id="calc-network-btn" class="btn-primary">Рассчитать сеть</button>

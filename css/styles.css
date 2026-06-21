@@ -180,6 +180,46 @@ input:focus {
   color: var(--color-text-muted);
 }
 
+/* --- Сворачиваемые секции конструктора (проекты, версии) ------------------ */
+.net-section {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  margin-bottom: 18px;
+}
+
+.net-section-summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 12px 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.net-section-summary::-webkit-details-marker {
+  display: none;
+}
+
+.net-section-summary::before {
+  content: '▸';
+  color: var(--color-text-muted);
+}
+
+.net-section[open] > .net-section-summary::before {
+  content: '▾';
+}
+
+.net-section-summary:hover {
+  color: var(--color-accent);
+}
+
+.net-section-body {
+  padding: 0 14px 12px;
+}
+
 .radio-group {
   display: flex;
   gap: 20px;
