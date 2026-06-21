@@ -1631,9 +1631,53 @@ input:focus {
   display: none;
 }
 
+/* «Липкий» заголовок панели параметров: при прокрутке длинной формы остаётся
+   виден, не теряя контекста, какой узел редактируется. Отрицательные боковые
+   отступы и фон под цвет страницы перекрывают поля, проезжающие под ним; верхний
+   край совпадает с краем секции .net-section-body (padding 0 14px 12px). */
+.net-panel-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 -14px 8px;
+  padding: 10px 14px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.net-panel-header-main {
+  min-width: 0;
+}
+
+.net-panel-collapse-btn {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.net-panel-collapse-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
 .net-panel-header h3 {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   font-size: 1.05rem;
+}
+
+/* Внутри липкого заголовка хлебные крошки не должны раздувать его высоту. */
+.net-panel-header .net-breadcrumb {
+  margin-bottom: 0;
 }
 
 .net-breadcrumb {
