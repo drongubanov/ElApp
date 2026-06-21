@@ -184,6 +184,8 @@ const multiDuplicateBtn = document.getElementById('multi-duplicate-btn');
 const multiDeleteBtn = document.getElementById('multi-delete-btn');
 const multiClearBtn = document.getElementById('multi-clear-btn');
 const networkPanel = document.getElementById('network-panel');
+const netPanelSection = document.getElementById('net-panel-section');
+const netPanelSummaryName = document.getElementById('net-panel-summary-name');
 const netPanelTitle = document.getElementById('net-panel-title');
 const netBreadcrumb = document.getElementById('net-breadcrumb');
 
@@ -1497,8 +1499,18 @@ function drawConnectors() {
   const treeRect = tree.getBoundingClientRect();
   if (treeRect.width === 0 || treeRect.height === 0) return;
 
-  const w = Math.ceil(treeRect.width);
-  const h = Math.ceil(treeRect.height);
+  // .net-tree может быть масштабирован CSS-трансформацией (зум). SVG-слой лежит
+  // ВНУТРИ масштабируемого элемента, поэтому его внутренние координаты должны быть
+  // в немасштабированной системе (layout-px): иначе getBoundingClientRect (он уже
+  // учитывает масштаб) даёт двойное масштабирование — линии «разъезжаются» и
+  // частично уходят за пределы слоя. Масштаб берём как отношение видимой ширины к
+  // layout-ширине (offsetWidth трансформацию игнорирует) и делим на него все
+  // измерения из getBoundingClientRect.
+  const scale = tree.offsetWidth ? treeRect.width / tree.offsetWidth : 1;
+  const toLocal = (screenDelta) => screenDelta / scale;
+
+  const w = Math.ceil(tree.offsetWidth);
+  const h = Math.ceil(tree.offsetHeight);
   svg.setAttribute('width', String(w));
   svg.setAttribute('height', String(h));
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
@@ -1514,13 +1526,13 @@ function drawConnectors() {
     if (!childUl) return;
 
     const pr = wrap.getBoundingClientRect();
-    const px = pr.left - treeRect.left + pr.width / 2;
-    const py = pr.top - treeRect.top + pr.height;
+    const px = toLocal(pr.left - treeRect.left + pr.width / 2);
+    const py = toLocal(pr.top - treeRect.top + pr.height);
 
     childUl.querySelectorAll(':scope > li > .net-node-wrap').forEach((childWrap) => {
       const cr = childWrap.getBoundingClientRect();
-      const cx = cr.left - treeRect.left + cr.width / 2;
-      const cy = cr.top - treeRect.top;
+      const cx = toLocal(cr.left - treeRect.left + cr.width / 2);
+      const cy = toLocal(cr.top - treeRect.top);
       const midY = (py + cy) / 2;
       const childId = childWrap.dataset.id;
       const path = document.createElementNS(SVG_NS, 'path');
@@ -1740,8 +1752,15 @@ function renderHeatMap() {
     const card = wrap.querySelector('.net-node');
     const color = nodeLoadColor(wrap.dataset.id, range);
     if (card && color) {
+      // Выбранный узел: инлайн-цвет нагрузки перекрыл бы рамку выделения из CSS,
+      // а тёплый цвет шкалы совпадает с акцентным — выделение стало бы незаметным.
+      // Поэтому сохраняем свечение цвета нагрузки, но добавляем яркое контрастное
+      // кольцо (цвет текста), чтобы выбранный узел был виден при любом цвете шкалы.
+      const isSelected = card.classList.contains('selected') || card.classList.contains('multi-selected');
       card.style.borderColor = color.solid;
-      card.style.boxShadow = `0 0 0 1px ${color.solid}, 0 0 8px 2px rgba(${color.r}, ${color.g}, ${color.b}, 0.35)`;
+      card.style.boxShadow = isSelected
+        ? `0 0 0 2px var(--color-text), 0 0 10px 3px rgba(${color.r}, ${color.g}, ${color.b}, 0.5)`
+        : `0 0 0 1px ${color.solid}, 0 0 8px 2px rgba(${color.r}, ${color.g}, ${color.b}, 0.35)`;
     }
   });
 
@@ -2155,9 +2174,11 @@ function renderPanel() {
   const node = findNode(networkTree, selectedNodeId);
   if (!node) {
     networkPanel.hidden = true;
+    netPanelSummaryName.textContent = '';
     return;
   }
   networkPanel.hidden = false;
+  netPanelSummaryName.textContent = node.name;
   netPanelTitle.textContent = node.name;
   renderBreadcrumb(node);
   nodeNameInput.value = node.name;
@@ -2209,6 +2230,10 @@ function renderPanel() {
 }
 
 function selectNode(id) {
+  // Выбор узла раскрывает сворачиваемую секцию параметров — даже при повторном
+  // клике по уже выбранному узлу (открытие <details> не перестраивает дерево,
+  // поэтому это безопасно делать до проверки ниже и не ломает двойной клик).
+  if (netPanelSection) netPanelSection.open = true;
   // Если узел уже единственный выбранный — состояние не меняется, и полную
   // перерисовку дерева можно пропустить. Помимо лишней работы, без этой
   // проверки второй клик двойного клика всегда перестраивал бы DOM прямо
