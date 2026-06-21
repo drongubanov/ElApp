@@ -535,6 +535,18 @@
           </div>
         </fieldset>
 
+        <div class="field" id="node-target-pf-field" hidden>
+          <label for="node-target-pf">Целевой cosφ компенсации, cosφ₂</label>
+          <input type="number" id="node-target-pf" inputmode="decimal" step="0.01" min="0.8" max="1" value="0.95" />
+          <p class="note">
+            Если итоговый cosφ узла (собственная нагрузка + дочерние узлы) ниже целевого, будет
+            показана требуемая мощность конденсаторной батареи Qc = Q − P·tgφ₂ для его повышения.
+            Типичный целевой cosφ, который сетевые организации обычно требуют от промышленных
+            потребителей, — 0,92–0,95; значение не привязано к конкретному нормативу и может быть
+            изменено.
+          </p>
+        </div>
+
         <div class="field" id="node-kc-field" hidden>
           <label for="node-kc">Коэффициент одновременности дочерних узлов, Кс</label>
           <input type="number" id="node-kc" inputmode="decimal" step="0.05" min="0.1" max="1" value="1" />
