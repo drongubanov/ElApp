@@ -6,7 +6,17 @@
 
 import { calculate, calculateVoltageDrop, NETWORK_TYPES } from './calculations.js';
 import { recommendProtection, checkSelectivity } from './tables.js';
-import { transformerImpedance, cableResistance, checkDisconnectionByCurve } from './shortCircuit.js';
+import { transformerImpedance, cableResistance, checkDisconnectionByCurve, minThermalSection } from './shortCircuit.js';
+
+// Время отключения (с), принимаемое для проверки термической стойкости кабеля
+// при КЗ, в зависимости от того, гарантирует ли расчётный ток КЗ мгновенное
+// срабатывание электромагнитного расцепителя (см. checkDisconnectionByCurve):
+// 0,1 с — консервативная верхняя оценка для «мгновенного» отключения (реальное
+// время отсечки обычно ощутимо меньше); 5 с — нормативный максимум для систем
+// TN по ПУЭ-7 п. 1.7.79 для распределительных линий, принимается как
+// консервативная оценка сверху, если мгновенное срабатывание не гарантировано
+// и точное время отключения по времятоковой характеристике аппарата неизвестно.
+const THERMAL_TRIP_TIME = { instant: 0.1, delayed: 5 };
 
 const PHASE_FACTOR = {
   [NETWORK_TYPES.DC]: 1,
@@ -214,6 +224,10 @@ function chosenCable(protection) {
  * Проверка времени отключения проводится по характеристике автомата C, если
  * для узла не подобрана другая (см. recommendedCurve для электродвигателей) —
  * это наиболее распространённая характеристика, но не единственно возможная.
+ * Дополнительно проверяется термическая стойкость выбранного сечения кабеля
+ * тепловому воздействию тока КЗ (Iкз(3), как наибольшего из двух) за принятое
+ * время отключения (THERMAL_TRIP_TIME) — см. minThermalSection в
+ * js/shortCircuit.js.
  */
 export function annotateShortCircuit(rootNode, rootCalc) {
   const { transformerPowerKva, transformerUkPercent } = rootNode;
@@ -245,7 +259,17 @@ export function annotateShortCircuit(rootNode, rootCalc) {
       const disconnection = calcNode.protection?.breaker
         ? checkDisconnectionByCurve({ singlePhaseCurrent: i1, breakerRating: calcNode.protection.breaker, curve })
         : null;
-      calcNode.shortCircuit = { zT, resistance, i3, i1, curve, disconnection };
+
+      let thermalCheck = null;
+      if (disconnection && cable) {
+        const time = disconnection.ok ? THERMAL_TRIP_TIME.instant : THERMAL_TRIP_TIME.delayed;
+        const minSection = minThermalSection({ current: i3, time, material: cable.material });
+        if (minSection != null) {
+          thermalCheck = { time, minSection, actualSection: cable.section, ok: cable.section >= minSection };
+        }
+      }
+
+      calcNode.shortCircuit = { zT, resistance, i3, i1, curve, disconnection, thermalCheck };
     }
 
     node.children.forEach((child, index) => walk(child, calcNode.children[index], resistance));

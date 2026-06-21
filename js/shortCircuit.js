@@ -81,3 +81,25 @@ export function checkDisconnectionByCurve({ singlePhaseCurrent, breakerRating, c
   const tripThreshold = multiplier * breakerRating;
   return { tripThreshold, ok: singlePhaseCurrent >= tripThreshold };
 }
+
+// Коэффициент термической стойкости жилы при КЗ (IEC 60364-4-43, табл. 43A /
+// ГОСТ Р 50571.4.43, формула S = I·√t/k) для жил с ПВХ-изоляцией — той же, для
+// которой даны допустимые токи в CABLE_TABLE (tables.js); приложение не
+// различает типы изоляции, поэтому отдельной таблицы под XLPE/EPR здесь нет.
+export const THERMAL_WITHSTAND_K = {
+  copper: 115,
+  aluminum: 76,
+};
+
+/**
+ * Минимальное по термической стойкости при КЗ сечение жилы (мм²):
+ * Sмин = Iкз·√t / k, где Iкз — ток КЗ (А), t — время отключения защитой (с),
+ * k — коэффициент материала жилы (THERMAL_WITHSTAND_K). Приближение не
+ * учитывает начальную температуру жилы перед КЗ (формула рассчитана на нагрев
+ * от номинальной рабочей температуры до предельно допустимой при КЗ).
+ */
+export function minThermalSection({ current, time, material }) {
+  const k = THERMAL_WITHSTAND_K[material];
+  if (!k || !(current > 0) || !(time > 0)) return null;
+  return (current * Math.sqrt(time)) / k;
+}

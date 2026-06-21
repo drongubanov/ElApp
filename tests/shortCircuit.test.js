@@ -5,6 +5,8 @@ import {
   cableResistance,
   calculateShortCircuit,
   checkDisconnectionByCurve,
+  minThermalSection,
+  THERMAL_WITHSTAND_K,
 } from '../js/shortCircuit.js';
 
 test('transformerImpedance: Zт = (uк/100)·Uл²/Sт', () => {
@@ -74,4 +76,25 @@ test('checkDisconnectionByCurve: ток КЗ ниже порога → не об
 test('checkDisconnectionByCurve: некорректные данные → null', () => {
   assert.equal(checkDisconnectionByCurve({ singlePhaseCurrent: 600, breakerRating: 25, curve: 'X' }), null);
   assert.equal(checkDisconnectionByCurve({ singlePhaseCurrent: 0, breakerRating: 25, curve: 'C' }), null);
+});
+
+test('minThermalSection: Sмин = Iкз·√t/k для меди и алюминия', () => {
+  const copper = minThermalSection({ current: 1000, time: 0.1, material: 'copper' });
+  assert.ok(Math.abs(copper - (1000 * Math.sqrt(0.1)) / THERMAL_WITHSTAND_K.copper) < 1e-9);
+
+  const aluminum = minThermalSection({ current: 1000, time: 0.1, material: 'aluminum' });
+  assert.ok(Math.abs(aluminum - (1000 * Math.sqrt(0.1)) / THERMAL_WITHSTAND_K.aluminum) < 1e-9);
+  assert.ok(aluminum > copper); // у алюминия k меньше → требуется большее сечение при том же токе и времени
+});
+
+test('minThermalSection: дольше время отключения → больше требуемое сечение', () => {
+  const fast = minThermalSection({ current: 500, time: 0.1, material: 'copper' });
+  const slow = minThermalSection({ current: 500, time: 5, material: 'copper' });
+  assert.ok(slow > fast);
+});
+
+test('minThermalSection: некорректные данные → null', () => {
+  assert.equal(minThermalSection({ current: 0, time: 0.1, material: 'copper' }), null);
+  assert.equal(minThermalSection({ current: 500, time: 0, material: 'copper' }), null);
+  assert.equal(minThermalSection({ current: 500, time: 0.1, material: 'gold' }), null);
 });
