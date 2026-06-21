@@ -117,6 +117,10 @@ const networkTreeEl = document.getElementById('network-tree');
 const calcNetworkBtn = document.getElementById('calc-network-btn');
 const undoNetworkBtn = document.getElementById('undo-network-btn');
 const heatmapToggleBtn = document.getElementById('heatmap-toggle-btn');
+const heatmapLegend = document.getElementById('heatmap-legend');
+const heatmapLegendMin = document.getElementById('heatmap-legend-min');
+const heatmapLegendMax = document.getElementById('heatmap-legend-max');
+const heatmapLegendBar = document.getElementById('heatmap-legend-bar');
 const exportMenuBtn = document.getElementById('export-menu-btn');
 const exportDropdown = document.getElementById('export-dropdown');
 const exportPdfBtn = document.getElementById('export-pdf-btn');
@@ -1337,6 +1341,23 @@ function loadColorRgb(t) {
   return [0, 1, 2].map((k) => Math.round(a[k] + (b[k] - a[k]) * f));
 }
 
+// Градиент легенды строится из тех же опорных цветов, что и сама раскраска
+// (LOAD_COLOR_STOPS), а не задаётся отдельно в CSS — так оба места гарантированно
+// не расходятся, если шкалу когда-нибудь поменяют.
+heatmapLegendBar.style.background =
+  `linear-gradient(to right, ${LOAD_COLOR_STOPS.map((c, i) => `rgb(${c[0]}, ${c[1]}, ${c[2]}) ${(i / (LOAD_COLOR_STOPS.length - 1)) * 100}%`).join(', ')})`;
+
+/** Показывает легенду тепловой карты с фактическим диапазоном токов дерева. */
+function updateHeatMapLegend(range) {
+  heatmapLegendMin.textContent = formatCurrent(range.min);
+  heatmapLegendMax.textContent = range.max > range.min ? formatCurrent(range.max) : '';
+  heatmapLegend.hidden = false;
+}
+
+function hideHeatMapLegend() {
+  heatmapLegend.hidden = true;
+}
+
 /** Диапазон расчётных токов по всем рассчитанным узлам — основа для нормировки нагрузки. */
 function currentRange() {
   if (!lastCalcMap) return null;
@@ -1450,9 +1471,16 @@ function clearHoverPath() {
  * эту функцию снова, чтобы вернуть постоянную раскраску.
  */
 function renderHeatMap() {
-  if (!heatMapEnabled) return;
+  if (!heatMapEnabled) {
+    hideHeatMapLegend();
+    return;
+  }
   const range = currentRange();
-  if (!range) return;
+  if (!range) {
+    hideHeatMapLegend();
+    return;
+  }
+  updateHeatMapLegend(range);
 
   networkTreeEl.querySelectorAll('.net-node-wrap').forEach((wrap) => {
     const card = wrap.querySelector('.net-node');
@@ -1784,7 +1812,10 @@ heatmapToggleBtn.addEventListener('click', () => {
   heatmapToggleBtn.setAttribute('aria-pressed', String(heatMapEnabled));
   heatmapToggleBtn.classList.toggle('is-active', heatMapEnabled);
   if (heatMapEnabled) renderHeatMap();
-  else clearHoverInlineStyles();
+  else {
+    clearHoverInlineStyles();
+    hideHeatMapLegend();
+  }
 });
 
 multiDuplicateBtn.addEventListener('click', duplicateSelected);
