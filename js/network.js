@@ -7,6 +7,7 @@
 import { calculate, calculateVoltageDrop, neutralCurrent, NETWORK_TYPES } from './calculations.js';
 import { recommendProtection, checkSelectivity, recommendPeSection } from './tables.js';
 import { transformerImpedance, cableResistance, checkDisconnectionByCurve, minThermalSection } from './shortCircuit.js';
+import { groupDemand } from './demandFactor.js';
 
 // Система заземления сети до 1 кВ (ГОСТ Р 50571.2 / ПУЭ-7 гл. 1.7). Влияет на то,
 // чем обеспечивается автоматическое отключение при замыкании на открытые
@@ -95,6 +96,14 @@ export function calculateLineVoltageDrop(result, protection, cableLength) {
  * (loadType: 'motor'), дополнительно считается пусковой ток собственной
  * нагрузки по кратности startCurrentRatio — он передаётся в подбор защиты
  * для выбора характеристики автомата (B/C/D), устойчивой к пуску.
+ *
+ * Альтернативный способ задания собственной нагрузки — loadInputMode:
+ * 'group': вместо одного значения known/knownValue указывается список
+ * приёмников группы (receivers: [{ installedP, ku }]), и собственная
+ * активная мощность узла считается методом Ки/Кр (см. demandFactor.js) —
+ * Pр = Кс.гр·ΣPн. Коэффициент использования utilizationFactor и пусковой
+ * ток в этом режиме не применяются: каждый приёмник группы уже учтён
+ * своим Ки внутри groupDemand.
  */
 export function calculateNode({
   networkType,
@@ -103,6 +112,8 @@ export function calculateNode({
   hasOwnLoad,
   known,
   knownValue,
+  loadInputMode = 'direct',
+  receivers = [],
   installationMethod,
   cableCount,
   cableLength,
@@ -126,7 +137,17 @@ export function calculateNode({
   let ownQ = 0;
   let installed = null;
   let startCurrent = null;
-  if (hasOwnLoad) {
+  let groupResult = null;
+  if (hasOwnLoad && loadInputMode === 'group') {
+    groupResult = groupDemand(receivers);
+    if (!groupResult) {
+      throw new Error('В группе приёмников должен быть хотя бы один приёмник с установленной мощностью и Ки больше нуля');
+    }
+    const own = calculate({ networkType, voltage, powerFactor, known: 'power', knownValue: groupResult.calculatedP });
+    ownP = own.P;
+    ownQ = own.Q;
+    installed = { P: own.P, S: own.S, I: own.I };
+  } else if (hasOwnLoad) {
     const own = calculate({ networkType, voltage, powerFactor, known, knownValue });
     ownP = own.P * utilizationFactor;
     ownQ = own.Q * utilizationFactor;
@@ -164,7 +185,19 @@ export function calculateNode({
   const voltageDrop = calculateLineVoltageDrop(result, protection, cableLength);
   const phaseDistribution = phaseBalance(I, networkType, phaseShares);
 
-  return { result, protection, voltageDrop, phaseBalance: phaseDistribution, ownP, ownQ, installed, startCurrent, utilizationFactor, loadType };
+  return {
+    result,
+    protection,
+    voltageDrop,
+    phaseBalance: phaseDistribution,
+    ownP,
+    ownQ,
+    installed,
+    startCurrent,
+    utilizationFactor,
+    loadType,
+    groupDemand: groupResult,
+  };
 }
 
 /**
@@ -233,6 +266,7 @@ export function calculateTree(node) {
     ownQ: calc?.ownQ ?? 0,
     installed: calc?.installed ?? null,
     startCurrent: calc?.startCurrent ?? null,
+    groupDemand: calc?.groupDemand ?? null,
     sumOfChildBreakers,
     maxOfChildBreakers,
     selectivity,

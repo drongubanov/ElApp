@@ -252,6 +252,83 @@ test('calculateNode: для общей нагрузки пусковой ток 
   assert.equal(node.protection.recommendedCurve, null);
 });
 
+test('calculateNode: loadInputMode "group" с единственным приёмником даёт Pр = ΣPн (Кс.гр = 1)', () => {
+  const node = calculateNode({
+    networkType: NETWORK_TYPES.DC,
+    voltage: 24,
+    hasOwnLoad: true,
+    loadInputMode: 'group',
+    receivers: [{ installedP: 240, ku: 0.6 }],
+    installationMethod: 'air',
+    cableCount: 1,
+    cableLength: 0,
+  });
+  assert.equal(node.result.P, 240);
+  assert.equal(node.result.I, 10);
+  assert.ok(node.groupDemand);
+  assert.equal(node.groupDemand.nEffective, 1);
+  assert.equal(node.groupDemand.supplyFactor, 1);
+  assert.equal(node.groupDemand.count, 1);
+});
+
+test('calculateNode: loadInputMode "group" со смешанной группой приёмников считает Pр методом Ки/Кр', () => {
+  const node = calculateNode({
+    networkType: NETWORK_TYPES.DC,
+    voltage: 24,
+    hasOwnLoad: true,
+    loadInputMode: 'group',
+    receivers: [
+      { installedP: 100, ku: 0.7 },
+      { installedP: 50, ku: 0.5 },
+      { installedP: 20, ku: 0.8 },
+      { installedP: 10, ku: 0.3 },
+    ],
+    installationMethod: 'air',
+    cableCount: 1,
+    cableLength: 0,
+  });
+  assert.ok(Math.abs(node.result.P - 155.80643225363505) < 1e-6);
+  assert.ok(Math.abs(node.result.I - 6.491934677234794) < 1e-6);
+  assert.ok(node.groupDemand);
+  assert.equal(node.groupDemand.installedTotal, 180);
+  assert.equal(node.groupDemand.count, 4);
+});
+
+test('calculateNode: loadInputMode "group" без корректных приёмников — ошибка', () => {
+  assert.throws(() =>
+    calculateNode({
+      networkType: NETWORK_TYPES.DC,
+      voltage: 24,
+      hasOwnLoad: true,
+      loadInputMode: 'group',
+      receivers: [],
+      installationMethod: 'air',
+      cableCount: 1,
+    }),
+  );
+});
+
+test('calculateTree: узел в режиме "group" передаёт groupDemand в результат дерева', () => {
+  const tree = {
+    id: 'root',
+    name: 'Группа приёмников',
+    networkType: NETWORK_TYPES.DC,
+    voltage: 24,
+    hasOwnLoad: true,
+    loadInputMode: 'group',
+    receivers: [{ installedP: 240, ku: 0.6 }],
+    installationMethod: 'air',
+    cableCount: 1,
+    cableLength: 0,
+    simultaneityFactor: 1,
+    children: [],
+  };
+  const calc = calculateTree(tree);
+  assert.equal(calc.error, null);
+  assert.ok(calc.groupDemand);
+  assert.equal(calc.groupDemand.count, 1);
+});
+
 test('calculateTree считает наибольший номинал среди дочерних автоматов и проверяет селективность', () => {
   const tree = {
     id: 'root',
