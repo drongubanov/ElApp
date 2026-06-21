@@ -75,6 +75,8 @@ export function calculateNode({
   installationMethod,
   cableCount,
   cableLength,
+  ambientTemp,
+  insulation,
   simultaneityFactor = 1,
   utilizationFactor = 1,
   loadType = 'general',
@@ -126,7 +128,7 @@ export function calculateNode({
   const nodePowerFactor = S > 0 ? Math.min(P / S, 1) : 1;
 
   const result = { networkType, voltage, powerFactor: nodePowerFactor, P, Q, S, I };
-  const protection = recommendProtection(I, { installationMethod, cableCount, startCurrent });
+  const protection = recommendProtection(I, { installationMethod, cableCount, startCurrent, ambientTemp, insulation });
   const voltageDrop = calculateLineVoltageDrop(result, protection, cableLength);
 
   return { result, protection, voltageDrop, ownP, ownQ, installed, startCurrent, utilizationFactor, loadType };

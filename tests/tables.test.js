@@ -7,8 +7,10 @@ import {
   recommendBreakerCurve,
   checkSelectivity,
   recommendPeSection,
+  temperatureFactor,
   BREAKER_RATINGS,
   SELECTIVITY_SAFE_RATIO,
+  BASE_AMBIENT_TEMP,
 } from '../js/tables.js';
 
 test('selectBreaker выбирает ближайший номинал не меньше тока', () => {
@@ -68,6 +70,54 @@ test('recommendProtection учитывает поправочный коэффи
 test('recommendProtection с неизвестным способом прокладки не применяет поправку', () => {
   const result = recommendProtection(14.2, { installationMethod: 'unknown' });
   assert.equal(result.correction, 1);
+});
+
+test('temperatureFactor: при базовой температуре коэффициент равен 1 для любой изоляции', () => {
+  assert.equal(temperatureFactor(BASE_AMBIENT_TEMP, 'pvc'), 1);
+  assert.equal(temperatureFactor(BASE_AMBIENT_TEMP, 'xlpe'), 1);
+});
+
+test('temperatureFactor: выше базовой температуры допустимый ток снижается', () => {
+  const k = temperatureFactor(45, 'pvc');
+  assert.ok(Math.abs(k - Math.sqrt((70 - 45) / (70 - 25))) < 1e-9);
+  assert.ok(k < 1);
+});
+
+test('temperatureFactor: сшитый полиэтилен снижает ток медленнее ПВХ при той же температуре', () => {
+  assert.ok(temperatureFactor(45, 'xlpe') > temperatureFactor(45, 'pvc'));
+});
+
+test('temperatureFactor: температура не ниже предельной для изоляции → null', () => {
+  assert.equal(temperatureFactor(70, 'pvc'), null);
+  assert.equal(temperatureFactor(95, 'xlpe'), null);
+});
+
+test('temperatureFactor: неизвестная изоляция → null, отсутствие температуры → базовая (k=1)', () => {
+  assert.equal(temperatureFactor(45, 'unknown'), null);
+  assert.equal(temperatureFactor(undefined, 'pvc'), 1);
+});
+
+test('recommendProtection: высокая температура среды снижает поправку и увеличивает сечение', () => {
+  const base = recommendProtection(30, { ambientTemp: 25, insulation: 'pvc' });
+  const hot = recommendProtection(30, { ambientTemp: 45, insulation: 'pvc' });
+  assert.equal(base.breaker, 32);
+  assert.equal(hot.breaker, 32);
+  assert.ok(hot.correction < base.correction);
+  assert.ok(hot.copperCable.section > base.copperCable.section);
+});
+
+test('recommendProtection: сшитый полиэтилен даёт поправку не хуже ПВХ при той же жаре', () => {
+  const pvc = recommendProtection(30, { ambientTemp: 45, insulation: 'pvc' });
+  const xlpe = recommendProtection(30, { ambientTemp: 45, insulation: 'xlpe' });
+  assert.ok(xlpe.correction > pvc.correction);
+});
+
+test('recommendProtection: при недопустимой температуре среды кабель не подбирается', () => {
+  const result = recommendProtection(30, { ambientTemp: 80, insulation: 'pvc' });
+  assert.equal(result.tempFactor, null);
+  assert.equal(result.correction, 0);
+  assert.equal(result.copperCable, null);
+  assert.equal(result.aluminumCable, null);
 });
 
 test('recommendProtection без пускового тока не указывает характеристику автомата', () => {

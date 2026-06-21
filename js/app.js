@@ -188,6 +188,8 @@ const nodeTransformerUkInput = document.getElementById('node-transformer-uk');
 const nodeCableLegend = document.getElementById('node-cable-legend');
 const nodeInstallationSelect = document.getElementById('node-installation');
 const nodeCableCountInput = document.getElementById('node-cable-count');
+const nodeAmbientTempInput = document.getElementById('node-ambient-temp');
+const nodeInsulationSelect = document.getElementById('node-insulation');
 const nodeCableLengthInput = document.getElementById('node-cable-length');
 const nodeKcField = document.getElementById('node-kc-field');
 const nodeKcInput = document.getElementById('node-kc');
@@ -289,6 +291,8 @@ function createNode(overrides = {}) {
     installationMethod: 'air',
     cableCount: 1,
     cableLength: 0,
+    ambientTemp: 25,
+    insulation: 'pvc',
     simultaneityFactor: 1,
     utilizationFactor: 1,
     loadType: 'general',
@@ -1632,12 +1636,25 @@ function renderNodeResult(node) {
     cableSections.push(`алюминий ${protection.aluminumCable.section} мм²`);
     cableAmpacities.push(`алюминий — ${protection.aluminumCable.ratedCurrent} А`);
   }
-  if (cableSections.length) {
+  const insulationLabel = node.insulation === 'xlpe' ? 'сшитый полиэтилен' : 'ПВХ';
+  if (protection.tempFactor === null) {
     addResultItem(nodeResDetails, {
       label: 'Сечение кабеля',
-      value: cableSections.join(' · '),
-      note: `Допустимый длительный ток: ${cableAmpacities.join(', ')}.`,
+      value: '—',
+      note:
+        `Температура среды ${node.ambientTemp} °C недопустима для изоляции «${insulationLabel}» — длительная ` +
+        'работа кабеля невозможна (температура жилы достигнет предельной). Снизьте температуру среды или выберите ' +
+        'изоляцию с более высокой допустимой температурой.',
+      status: 'warn',
     });
+  } else if (cableSections.length) {
+    let note = `Допустимый длительный ток: ${cableAmpacities.join(', ')}.`;
+    if (protection.correction < 0.999) {
+      note +=
+        ` Сечение подобрано с учётом поправочного коэффициента ×${protection.correction.toFixed(2)} ` +
+        `(способ прокладки, число кабелей рядом, температура среды ${node.ambientTemp} °C, изоляция «${insulationLabel}»).`;
+    }
+    addResultItem(nodeResDetails, { label: 'Сечение кабеля', value: cableSections.join(' · '), note });
   } else {
     addResultItem(nodeResDetails, {
       label: 'Сечение кабеля',
@@ -1774,6 +1791,8 @@ function renderPanel() {
   }
   nodeInstallationSelect.value = node.installationMethod;
   nodeCableCountInput.value = node.cableCount;
+  nodeAmbientTempInput.value = node.ambientTemp ?? 25;
+  nodeInsulationSelect.value = node.insulation ?? 'pvc';
   nodeCableLengthInput.value = node.cableLength || '';
   nodeKcInput.value = node.simultaneityFactor;
   nodeUtilizationInput.value = node.utilizationFactor ?? 1;
@@ -1817,6 +1836,8 @@ function onPanelChange() {
     : Number(nodeCurrentValueInput.value);
   node.installationMethod = nodeInstallationSelect.value;
   node.cableCount = Number(nodeCableCountInput.value) || 1;
+  node.ambientTemp = nodeAmbientTempInput.value === '' ? 25 : Number(nodeAmbientTempInput.value);
+  node.insulation = nodeInsulationSelect.value;
   node.cableLength = Number(nodeCableLengthInput.value) || 0;
   node.simultaneityFactor = Number(nodeKcInput.value) || 1;
   node.utilizationFactor = Number(nodeUtilizationInput.value) || 1;
@@ -1844,7 +1865,7 @@ nodeNetworkTypeSelect.addEventListener('change', () => {
 [
   nodeNameInput, nodeHasOwnLoadInput, nodeVoltageInput, nodePfInput,
   nodePowerValueInput, nodePowerUnitSelect, nodeCurrentValueInput, nodeInstallationSelect,
-  nodeCableCountInput, nodeCableLengthInput, nodeKcInput,
+  nodeCableCountInput, nodeAmbientTempInput, nodeInsulationSelect, nodeCableLengthInput, nodeKcInput,
   nodeUtilizationInput, nodeLoadTypeSelect, nodeStartRatioInput,
   nodeTransformerPowerInput, nodeTransformerUkInput,
   ...document.querySelectorAll('input[name="node-known"]'),

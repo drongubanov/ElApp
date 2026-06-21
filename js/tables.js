@@ -90,6 +90,45 @@ function groupingFactor(cableCount) {
   return GROUPING_FACTORS[Math.min(count, GROUPING_FACTORS.length) - 1];
 }
 
+export const INSULATION_TYPES = {
+  PVC: 'pvc',
+  XLPE: 'xlpe',
+};
+
+export const INSULATION_LABELS = {
+  [INSULATION_TYPES.PVC]: 'ПВХ (поливинилхлорид), макс. жилы +70 °C',
+  [INSULATION_TYPES.XLPE]: 'Сшитый полиэтилен (СПЭ), макс. жилы +90 °C',
+};
+
+// Максимально допустимая длительная температура жилы по типу изоляции
+// (ГОСТ Р МЭК 60364-5-52, ПУЭ): ПВХ — 70 °C, сшитый полиэтилен (СПЭ) — 90 °C.
+const INSULATION_MAX_TEMP = {
+  [INSULATION_TYPES.PVC]: 70,
+  [INSULATION_TYPES.XLPE]: 90,
+};
+
+// Базовая (нормированная) температура окружающей среды, для которой даны
+// табличные допустимые длительные токи CABLE_TABLE — воздух +25 °C (ПУЭ гл. 1.3).
+export const BASE_AMBIENT_TEMP = 25;
+
+/**
+ * Поправочный коэффициент к допустимому току на температуру окружающей среды,
+ * отличную от базовой (ГОСТ Р МЭК 60364-5-52, ПУЭ табл. 1.3.3):
+ *   k = √((θmax − θсреды) / (θmax − θбаз)),
+ * где θmax — максимально допустимая температура жилы по типу изоляции, θбаз —
+ * базовая температура таблицы (BASE_AMBIENT_TEMP). При θсреды = θбаз k = 1.
+ * Изоляция с более высокой θmax (сшитый полиэтилен) снижает ток медленнее при
+ * нагреве среды. Возвращает null при θсреды ≥ θmax (длительная работа кабеля
+ * невозможна) или неизвестном типе изоляции; при отсутствии θсреды берётся θбаз.
+ */
+export function temperatureFactor(ambientTemp, insulation = INSULATION_TYPES.PVC) {
+  const maxTemp = INSULATION_MAX_TEMP[insulation];
+  if (!maxTemp) return null;
+  const ambient = Number.isFinite(ambientTemp) ? ambientTemp : BASE_AMBIENT_TEMP;
+  if (ambient >= maxTemp) return null;
+  return Math.sqrt((maxTemp - ambient) / (maxTemp - BASE_AMBIENT_TEMP));
+}
+
 // Кратность тока срабатывания электромагнитного расцепителя (отсечки) для
 // стандартных характеристик автоматов по ГОСТ Р 50345 / IEC 60898 — указан
 // верхний предел диапазона каждой характеристики (B: 3–5, C: 5–10, D: 10–20),
@@ -114,27 +153,38 @@ export function recommendBreakerCurve(startCurrent, breakerRating) {
  * Подбирает автомат по расчётному току и кабели (медь/алюминий), способные
  * выдержать ток самого автомата — это гарантирует, что автомат защищает кабель.
  * Учитывает приближённые поправочные коэффициенты на способ прокладки и
- * количество кабелей, проложенных рядом (см. INSTALLATION_FACTORS).
+ * количество кабелей, проложенных рядом (см. INSTALLATION_FACTORS), а также на
+ * температуру окружающей среды и тип изоляции жилы (см. temperatureFactor).
  * Если передан пусковой ток нагрузки (startCurrent, например для
  * электродвигателя), дополнительно подбирает характеристику автомата (B/C/D),
  * устойчивую к этому пусковому току без ложного срабатывания.
  */
 export function recommendProtection(
   current,
-  { installationMethod = INSTALLATION_METHODS.AIR, cableCount = 1, startCurrent = null } = {},
+  {
+    installationMethod = INSTALLATION_METHODS.AIR,
+    cableCount = 1,
+    startCurrent = null,
+    ambientTemp = BASE_AMBIENT_TEMP,
+    insulation = INSULATION_TYPES.PVC,
+  } = {},
 ) {
   const methodFactor = INSTALLATION_FACTORS[installationMethod] ?? 1;
   const groupFactor = groupingFactor(cableCount);
-  const correction = methodFactor * groupFactor;
+  const tempFactor = temperatureFactor(ambientTemp, insulation);
+  // tempFactor === null означает θсреды ≥ θmax изоляции — длительная работа
+  // невозможна; берём 0, чтобы подбор кабеля не нашёл подходящего сечения.
+  const correction = methodFactor * groupFactor * (tempFactor ?? 0);
 
   const breaker = selectBreaker(current);
-  const target = (breaker ?? current) / correction;
+  const target = correction > 0 ? (breaker ?? current) / correction : Infinity;
   const hasStartCurrent = startCurrent > 0 && breaker;
   const recommendedCurve = hasStartCurrent ? recommendBreakerCurve(startCurrent, breaker) : null;
   return {
     current,
     breaker,
     correction,
+    tempFactor,
     copperCable: selectCable(target, 'copper'),
     aluminumCable: selectCable(target, 'aluminum'),
     startCurrent: startCurrent > 0 ? startCurrent : null,
