@@ -540,8 +540,12 @@ function renderBreadcrumb(node) {
 
 /** Выбирает узел и прокручивает его карточку в зону видимости, разворачивая свёрнутые ветви на пути к нему. */
 function revealNode(nodeId) {
-  if (expandAncestors(nodeId)) persistNetworkScheme();
+  const expanded = expandAncestors(nodeId);
+  if (expanded) persistNetworkScheme();
   selectNode(nodeId);
+  // selectNode() пропускает перерисовку, если узел уже был единственным
+  // выбранным — но раскрытие свёрнутых предков всё равно нужно отразить в DOM.
+  if (expanded) renderTree();
   requestAnimationFrame(() => {
     networkTreeEl
       .querySelector(`.net-node-wrap[data-id="${nodeId}"]`)
@@ -1025,6 +1029,53 @@ function toggleMultiSelect(id) {
   renderPanel();
 }
 
+/**
+ * Переименование узла прямо на блоке по двойному клику на названии — без
+ * открытия панели свойств. Подменяет текст на текстовое поле; Enter и потеря
+ * фокуса сохраняют новое имя, Escape отменяет правку без изменений.
+ */
+function startRenameNode(node, nameEl) {
+  if (nameEl.querySelector('input')) return;
+  const original = node.name;
+  nameEl.textContent = '';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'net-node-name-input';
+  input.value = original;
+  input.draggable = false;
+  nameEl.appendChild(input);
+  input.focus();
+  input.select();
+
+  let cancelled = false;
+
+  const commit = () => {
+    node.name = input.value.trim() || 'Узел';
+    persistNetworkScheme();
+    renderTree();
+    if (node.id === selectedNodeId) nodeNameInput.value = node.name;
+  };
+
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      input.blur();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelled = true;
+      renderTree();
+    }
+  });
+  input.addEventListener('blur', () => {
+    if (cancelled) return;
+    commit();
+  });
+  input.addEventListener('click', (event) => event.stopPropagation());
+  input.addEventListener('mousedown', (event) => event.stopPropagation());
+  input.addEventListener('dblclick', (event) => event.stopPropagation());
+}
+
 function renderNodeEl(node) {
   const li = document.createElement('li');
 
@@ -1160,6 +1211,11 @@ function renderNodeEl(node) {
   const name = document.createElement('span');
   name.className = 'net-node-name';
   name.textContent = node.name;
+  name.title = 'Двойной клик — переименовать';
+  name.addEventListener('dblclick', (event) => {
+    event.stopPropagation();
+    startRenameNode(node, name);
+  });
 
   const meta = document.createElement('span');
   meta.className = 'net-node-meta';
@@ -2109,6 +2165,12 @@ function renderPanel() {
 }
 
 function selectNode(id) {
+  // Если узел уже единственный выбранный — состояние не меняется, и полную
+  // перерисовку дерева можно пропустить. Помимо лишней работы, без этой
+  // проверки второй клик двойного клика всегда перестраивал бы DOM прямо
+  // перед событием dblclick, и оно срабатывало бы на уже отсоединённом узле
+  // (актуально для переименования по двойному клику на названии блока).
+  if (selectedNodeId === id && selectedNodeIds.size === 1 && selectedNodeIds.has(id)) return;
   selectedNodeId = id;
   selectedNodeIds = new Set([id]); // обычный клик сбрасывает множественный выбор
   renderTree();
