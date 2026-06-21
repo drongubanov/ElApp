@@ -1413,6 +1413,9 @@ input:focus {
 }
 
 .net-node-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -1421,6 +1424,25 @@ input:focus {
   border-radius: 0;
   padding: 2px 8px;
   white-space: nowrap;
+}
+
+/* Иконка типа узла внутри тега — наследует размер шрифта тега, цвет акцентный,
+   чтобы тип читался с одного взгляда даже когда подпись одинаковая
+   («НАГРУЗКА» у освещения, розеток и двигателя). */
+.net-node-kind-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-accent);
+}
+
+.net-node-kind-icon svg {
+  display: block;
+}
+
+/* Щит — нейтральный (конструктивный) тип, для него иконку приглушаем,
+   чтобы акцентный цвет оставался у источника (ввод) и конечных потребителей. */
+.net-node-tag[data-kind='panel'] .net-node-kind-icon {
+  color: var(--color-text-muted);
 }
 
 .net-node-toolbar {
