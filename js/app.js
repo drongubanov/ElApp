@@ -281,6 +281,43 @@ netZoomInBtn.addEventListener('click', () => setTreeZoom(treeZoom + TREE_ZOOM_ST
 netZoomOutBtn.addEventListener('click', () => setTreeZoom(treeZoom - TREE_ZOOM_STEP));
 netZoomResetBtn.addEventListener('click', () => setTreeZoom(1));
 
+// Колесо мыши с Ctrl/⌘ — зум к курсору (а не к центру дерева); также перехватывает
+// pinch-жест трекпада, который браузер сообщает как wheel-событие с ctrlKey=true.
+// Без модификатора preventDefault не вызывается — это оставляет обычную прокрутку
+// страницы/блока браузеру. transform-origin у .net-tree — «top center», поэтому
+// вместо вывода формулы сдвига вручную точка под курсором фиксируется через
+// повторный замер getBoundingClientRect до и после смены масштаба.
+networkTreeWrapperEl.addEventListener(
+  'wheel',
+  (event) => {
+    if (!(event.ctrlKey || event.metaKey)) return;
+    event.preventDefault();
+    const direction = event.deltaY < 0 ? 1 : -1;
+    const newZoom = Math.min(
+      TREE_ZOOM_MAX,
+      Math.max(TREE_ZOOM_MIN, Math.round((treeZoom + direction * TREE_ZOOM_STEP) * 10) / 10)
+    );
+    if (newZoom === treeZoom) return;
+
+    const beforeRect = networkTreeEl.getBoundingClientRect();
+    const fracX = beforeRect.width ? (event.clientX - beforeRect.left) / beforeRect.width : 0.5;
+    const fracY = beforeRect.height ? (event.clientY - beforeRect.top) / beforeRect.height : 0.5;
+
+    // .net-tree анимирует transform через CSS transition, поэтому сразу после
+    // смены масштаба getBoundingClientRect() ещё вернёт старую (дотранзишн)
+    // геометрию. На время замера отключаем transition, чтобы новая геометрия
+    // была доступна синхронно, как при обычном клике по кнопкам зума.
+    const prevTransition = networkTreeEl.style.transition;
+    networkTreeEl.style.transition = 'none';
+    setTreeZoom(newZoom);
+    const afterRect = networkTreeEl.getBoundingClientRect();
+    networkTreeWrapperEl.scrollLeft += afterRect.left + fracX * afterRect.width - event.clientX;
+    window.scrollBy(0, afterRect.top + fracY * afterRect.height - event.clientY);
+    networkTreeEl.style.transition = prevTransition;
+  },
+  { passive: false }
+);
+
 // Перемещение по дереву зажатой левой кнопкой мыши (pan) — полезно при увеличенном
 // масштабе или широкой схеме. Не перехватывает клики по узлам, кнопкам и другим
 // интерактивным элементам, чтобы не мешать их собственным обработчикам (выбор
