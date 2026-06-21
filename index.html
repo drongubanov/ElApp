@@ -494,6 +494,30 @@
           </div>
         </fieldset>
 
+        <fieldset class="field-group" id="node-phase-field" hidden>
+          <legend>Распределение нагрузки по фазам</legend>
+          <p class="note">
+            Доли нагрузки трёхфазного узла по фазам L1/L2/L3 (любые относительные веса —
+            нормируются автоматически). При неравномерном распределении в нулевом рабочем
+            проводнике появляется ток нейтрали, а самая загруженная фаза может превысить
+            номинал автомата, подобранного по симметричному току.
+          </p>
+          <div class="net-phase-row">
+            <div class="field">
+              <label for="node-phase-l1">L1</label>
+              <input type="number" id="node-phase-l1" inputmode="decimal" step="any" min="0" value="1" />
+            </div>
+            <div class="field">
+              <label for="node-phase-l2">L2</label>
+              <input type="number" id="node-phase-l2" inputmode="decimal" step="any" min="0" value="1" />
+            </div>
+            <div class="field">
+              <label for="node-phase-l3">L3</label>
+              <input type="number" id="node-phase-l3" inputmode="decimal" step="any" min="0" value="1" />
+            </div>
+          </div>
+        </fieldset>
+
         <div class="field" id="node-kc-field" hidden>
           <label for="node-kc">Коэффициент одновременности дочерних узлов, Кс</label>
           <input type="number" id="node-kc" inputmode="decimal" step="0.05" min="0.1" max="1" value="1" />

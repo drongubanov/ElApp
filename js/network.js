@@ -4,7 +4,7 @@
 // собственную нагрузку и дочерние узлы (например, щит, часть нагрузки
 // которого подключена напрямую, а часть — через под-щиты).
 
-import { calculate, calculateVoltageDrop, NETWORK_TYPES } from './calculations.js';
+import { calculate, calculateVoltageDrop, neutralCurrent, NETWORK_TYPES } from './calculations.js';
 import { recommendProtection, checkSelectivity, recommendPeSection } from './tables.js';
 import { transformerImpedance, cableResistance, checkDisconnectionByCurve, minThermalSection } from './shortCircuit.js';
 
@@ -40,6 +40,26 @@ const PHASE_FACTOR = {
 // назначения) — используется как значение по умолчанию, если для узла с
 // типом нагрузки «электродвигатель» не указано иное.
 export const DEFAULT_START_CURRENT_RATIO = 6;
+
+/**
+ * Распределение симметричного линейного тока трёхфазного узла по фазам L1/L2/L3
+ * согласно заданным относительным долям нагрузки (phaseShares) и ток нейтрали от
+ * получившейся несимметрии. Доли нормируются (любые неотрицательные веса), при
+ * равных долях каждая фаза несёт тот же ток I, что и при симметрии, а ток
+ * нейтрали равен нулю. Ток фазы k: Iк = 3·sк·I, где sк — нормированная доля.
+ * Возвращает null для не трёхфазных узлов или при нулевом токе.
+ */
+export function phaseBalance(lineCurrent, networkType, phaseShares) {
+  if (networkType !== NETWORK_TYPES.AC3 || !(lineCurrent > 0)) return null;
+  const weights = Array.isArray(phaseShares) && phaseShares.length === 3 ? phaseShares : [1, 1, 1];
+  const clean = weights.map((w) => (w >= 0 ? w : 0));
+  const total = clean[0] + clean[1] + clean[2];
+  if (!(total > 0)) return null;
+  const shares = clean.map((w) => w / total);
+  const currents = shares.map((s) => 3 * s * lineCurrent);
+  const neutral = neutralCurrent(currents[0], currents[1], currents[2]);
+  return { shares, currents, neutral, maxPhase: Math.max(...currents) };
+}
 
 /** Падение напряжения на линии, питающей узел, по фактически подобранному кабелю. */
 export function calculateLineVoltageDrop(result, protection, cableLength) {
@@ -88,6 +108,7 @@ export function calculateNode({
   cableLength,
   ambientTemp,
   insulation,
+  phaseShares,
   simultaneityFactor = 1,
   utilizationFactor = 1,
   loadType = 'general',
@@ -141,8 +162,9 @@ export function calculateNode({
   const result = { networkType, voltage, powerFactor: nodePowerFactor, P, Q, S, I };
   const protection = recommendProtection(I, { installationMethod, cableCount, startCurrent, ambientTemp, insulation });
   const voltageDrop = calculateLineVoltageDrop(result, protection, cableLength);
+  const phaseDistribution = phaseBalance(I, networkType, phaseShares);
 
-  return { result, protection, voltageDrop, ownP, ownQ, installed, startCurrent, utilizationFactor, loadType };
+  return { result, protection, voltageDrop, phaseBalance: phaseDistribution, ownP, ownQ, installed, startCurrent, utilizationFactor, loadType };
 }
 
 /**
@@ -206,6 +228,7 @@ export function calculateTree(node) {
     result: calc?.result ?? null,
     protection: calc?.protection ?? null,
     voltageDrop: calc?.voltageDrop ?? null,
+    phaseBalance: calc?.phaseBalance ?? null,
     ownP: calc?.ownP ?? 0,
     ownQ: calc?.ownQ ?? 0,
     installed: calc?.installed ?? null,

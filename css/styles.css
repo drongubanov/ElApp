@@ -538,6 +538,17 @@ input:focus {
   flex: 0 0 auto;
 }
 
+/* Три поля долей фаз L1/L2/L3 в одну строку. */
+.net-phase-row {
+  display: flex;
+  gap: 10px;
+}
+
+.net-phase-row .field {
+  flex: 1 1 0;
+  margin-bottom: 0;
+}
+
 .net-actions {
   display: flex;
   align-items: stretch;

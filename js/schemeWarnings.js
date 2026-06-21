@@ -98,6 +98,19 @@ export function collectSchemeWarnings(calcTree) {
         });
       }
 
+      if (calc.phaseBalance && calc.protection?.breaker && calc.phaseBalance.maxPhase > calc.protection.breaker) {
+        warnings.push({
+          nodeId: calc.id,
+          nodeName: calc.name,
+          severity: 'warn',
+          category: 'phase-balance',
+          message:
+            `Перекос фаз: при заданном распределении наиболее загруженная фаза несёт ` +
+            `${calc.phaseBalance.maxPhase.toFixed(1)} А — больше номинала автомата ${calc.protection.breaker} А ` +
+            `(подобран по симметричному току). Выровняйте нагрузку по фазам или увеличьте номинал.`,
+        });
+      }
+
       if (calc.selectivity && calc.selectivity.level !== 'selective') {
         warnings.push({
           nodeId: calc.id,
