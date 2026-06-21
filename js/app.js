@@ -39,6 +39,17 @@ const NETWORK_SHORT_LABELS = {
   [NETWORK_TYPES.AC3]: '3~',
 };
 
+// Порядок и подписи фильтров сводки проверок (см. category в collectSchemeWarnings).
+const WARNING_CATEGORY_LABELS = [
+  ['error', 'Ошибки расчёта'],
+  ['balance', 'Баланс нагрузки'],
+  ['voltage-drop', 'Потеря напряжения'],
+  ['short-circuit', 'Отключение при КЗ'],
+  ['thermal', 'Термостойкость КЗ'],
+  ['phase-balance', 'Перекос фаз'],
+  ['selectivity', 'Селективность'],
+];
+
 /**
  * Текст рекомендации по сечению PE/PEN-проводника для рассчитанной защиты:
  * по правилу ПУЭ-7 (табл. 1.7.5) от сечения фазного проводника. Для меди и
@@ -156,6 +167,7 @@ const networkDiffList = document.getElementById('network-diff-list');
 const networkErrorMessage = document.getElementById('network-error-message');
 const networkWarnings = document.getElementById('network-warnings');
 const netWarningsCount = document.getElementById('net-warnings-count');
+const netWarningsFilters = document.getElementById('net-warnings-filters');
 const netWarningsList = document.getElementById('net-warnings-list');
 const networkBom = document.getElementById('network-bom');
 const netBomCount = document.getElementById('net-bom-count');
@@ -431,6 +443,7 @@ let addMenuParentId = null;
 let addMenuAnchor = null;
 let heatMapEnabled = false;
 let treeZoom = 1;
+let activeWarningFilter = null; // category из collectSchemeWarnings, null — показывать все
 
 const UNDO_LIMIT = 20;
 let undoStack = [];
@@ -1311,7 +1324,8 @@ function renderMultiActions() {
 /**
  * Сводная панель проверок: собирает все замечания дерева (ошибки, баланс,
  * потеря напряжения, время отключения КЗ, селективность) в один кликабельный
- * список. Показывается только после расчёта (lastResultTree); до него скрыта.
+ * список с чипами-фильтрами по типу замечания. Показывается только после
+ * расчёта (lastResultTree); до него скрыта.
  */
 function renderWarnings() {
   if (!lastResultTree) {
@@ -1319,10 +1333,12 @@ function renderWarnings() {
     return;
   }
   networkWarnings.hidden = false;
+  netWarningsFilters.innerHTML = '';
   netWarningsList.innerHTML = '';
 
   const warnings = collectSchemeWarnings(lastResultTree);
   if (!warnings.length) {
+    activeWarningFilter = null;
     netWarningsCount.textContent = '';
     const li = document.createElement('li');
     li.className = 'net-warning-item ok';
@@ -1331,8 +1347,36 @@ function renderWarnings() {
     return;
   }
 
-  netWarningsCount.textContent = `(${warnings.length})`;
-  warnings.forEach((warning) => {
+  const counts = new Map();
+  warnings.forEach((w) => counts.set(w.category, (counts.get(w.category) || 0) + 1));
+  // Если выбранный ранее фильтр больше не встречается среди текущих замечаний — сбрасываем на «Все».
+  if (activeWarningFilter && !counts.has(activeWarningFilter)) activeWarningFilter = null;
+
+  if (counts.size > 1) {
+    const makeChip = (key, label, count) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'net-warning-chip';
+      if (key === activeWarningFilter) chip.classList.add('active');
+      chip.textContent = `${label} (${count})`;
+      chip.addEventListener('click', () => {
+        activeWarningFilter = activeWarningFilter === key ? null : key;
+        renderWarnings();
+      });
+      netWarningsFilters.appendChild(chip);
+    };
+    makeChip(null, 'Все', warnings.length);
+    WARNING_CATEGORY_LABELS.forEach(([key, label]) => {
+      if (counts.has(key)) makeChip(key, label, counts.get(key));
+    });
+  }
+
+  const visibleWarnings = activeWarningFilter ? warnings.filter((w) => w.category === activeWarningFilter) : warnings;
+  netWarningsCount.textContent =
+    activeWarningFilter && visibleWarnings.length !== warnings.length
+      ? `(${visibleWarnings.length} из ${warnings.length})`
+      : `(${warnings.length})`;
+  visibleWarnings.forEach((warning) => {
     const li = document.createElement('li');
     li.className = `net-warning-item ${warning.severity}`;
     li.setAttribute('role', 'button');
@@ -2281,6 +2325,7 @@ function performUndo() {
   if (!findNode(networkTree, selectedNodeId)) selectedNodeId = networkTree.id;
   lastCalcMap = null;
   lastResultTree = null;
+  activeWarningFilter = null;
   networkErrorMessage.textContent = '';
   clearSearch();
   updateUndoButtonUI();
@@ -2520,6 +2565,7 @@ resetNetworkBtn.addEventListener('click', () => {
   activeProjectId = null;
   lastCalcMap = null;
   lastResultTree = null;
+  activeWarningFilter = null;
   networkErrorMessage.textContent = '';
   clearSearch();
   persistNetworkScheme();
@@ -2542,6 +2588,7 @@ openProjectBtn.addEventListener('click', () => {
   activeProjectId = project.id;
   lastCalcMap = null;
   lastResultTree = null;
+  activeWarningFilter = null;
   networkErrorMessage.textContent = '';
   clearSearch();
   persistNetworkScheme();
