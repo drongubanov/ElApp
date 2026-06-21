@@ -138,6 +138,23 @@ input:focus {
   outline: 2px solid var(--color-accent);
 }
 
+/* Инлайн-валидация: подсветка некорректного поля и сообщение под ним. */
+.input-invalid,
+.input-invalid:hover {
+  border-color: var(--color-danger);
+}
+
+.input-invalid:focus {
+  outline-color: var(--color-danger);
+}
+
+.field-error {
+  margin: 6px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--color-danger);
+}
+
 .input-with-unit {
   display: flex;
   gap: 8px;

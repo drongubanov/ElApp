@@ -2498,6 +2498,7 @@ function renderPanel() {
   updateNodeLoadFieldsUI();
   updateNodeKnownFieldsUI();
   updateNodeLoadTypeUI();
+  validatePanelFields();
   renderNodeResult(node);
 }
 
@@ -2516,6 +2517,63 @@ function selectNode(id) {
   selectedNodeIds = new Set([id]); // обычный клик сбрасывает множественный выбор
   renderTree();
   renderPanel();
+}
+
+// --- Инлайн-валидация полей панели параметров ------------------------------
+// Каждое числовое поле проверяется на разумный диапазон прямо во время ввода;
+// при нарушении поле подсвечивается, а под ним появляется пояснение. Пустое
+// значение у диапазонных полей не считается ошибкой (пользователь может стирать
+// и набирать заново), кроме напряжения — без него расчёт бессмысленен.
+const rangeOk = (min, max) => (raw) => raw === '' || (Number(raw) >= min && Number(raw) <= max);
+const nonNegativeOk = (raw) => raw === '' || Number(raw) >= 0;
+
+const NODE_FIELD_VALIDATORS = [
+  [nodeVoltageInput, (raw) => raw !== '' && Number(raw) > 0, 'Напряжение должно быть больше 0.'],
+  [nodePfInput, rangeOk(0.01, 1), 'cos φ — в диапазоне 0,01–1.'],
+  [nodePowerValueInput, nonNegativeOk, 'Мощность не может быть отрицательной.'],
+  [nodeCurrentValueInput, nonNegativeOk, 'Ток не может быть отрицательным.'],
+  [nodeUtilizationInput, rangeOk(0.05, 1), 'Коэффициент использования Ku — в диапазоне 0,05–1.'],
+  [nodeStartRatioInput, rangeOk(1, 12), 'Кратность пускового тока — в диапазоне 1–12.'],
+  [nodeCableCountInput, (raw) => raw === '' || (Number.isInteger(Number(raw)) && Number(raw) >= 1), 'Число кабелей — целое не меньше 1.'],
+  [nodeAmbientTempInput, rangeOk(-40, 89), 'Температура — в диапазоне от −40 до 89 °C.'],
+  [nodeCableLengthInput, nonNegativeOk, 'Длина линии не может быть отрицательной.'],
+  [nodeKcInput, rangeOk(0.1, 1), 'Коэффициент одновременности Кс — в диапазоне 0,1–1.'],
+  [nodeTargetPfInput, rangeOk(0.8, 1), 'Целевой cos φ — в диапазоне 0,8–1.'],
+  [nodeTransformerPowerInput, nonNegativeOk, 'Мощность трансформатора не может быть отрицательной.'],
+  [nodeTransformerUkInput, nonNegativeOk, 'Напряжение короткого замыкания не может быть отрицательным.'],
+  [nodePhaseL1Input, nonNegativeOk, 'Доля фазы не может быть отрицательной.'],
+  [nodePhaseL2Input, nonNegativeOk, 'Доля фазы не может быть отрицательной.'],
+  [nodePhaseL3Input, nonNegativeOk, 'Доля фазы не может быть отрицательной.'],
+];
+
+function setFieldValidity(el, message) {
+  const field = el.closest('.field') || el.parentElement;
+  el.classList.toggle('input-invalid', Boolean(message));
+  el.setAttribute('aria-invalid', message ? 'true' : 'false');
+  let msgEl = field.querySelector('.field-error');
+  if (message) {
+    if (!msgEl) {
+      msgEl = document.createElement('p');
+      msgEl.className = 'field-error';
+      msgEl.setAttribute('role', 'alert');
+      field.appendChild(msgEl);
+    }
+    msgEl.textContent = message;
+  } else if (msgEl) {
+    msgEl.remove();
+  }
+}
+
+function validatePanelFields() {
+  NODE_FIELD_VALIDATORS.forEach(([el, check, message]) => {
+    if (!el) return;
+    // Скрытые поля (свёрнутые/неприменимые группы) не валидируем — снимаем метку.
+    if (el.offsetParent === null) {
+      setFieldValidity(el, '');
+      return;
+    }
+    setFieldValidity(el, check(el.value.trim()) ? '' : message);
+  });
 }
 
 function onPanelChange() {
@@ -2558,6 +2616,7 @@ function onPanelChange() {
   updateNodeLoadFieldsUI();
   updateNodeKnownFieldsUI();
   updateNodeLoadTypeUI();
+  validatePanelFields();
   persistNetworkScheme();
   renderTree();
 }
