@@ -105,3 +105,23 @@ test('collectSchemeWarnings: негарантированное отключен
   const sc = warnings.find((w) => w.category === 'short-circuit');
   assert.ok(sc, 'ожидается замечание о времени отключения при КЗ');
 });
+
+test('collectSchemeWarnings: недостаточная термостойкость кабеля к нагреву при КЗ попадает в сводку', () => {
+  // Малая нагрузка рядом с мощным трансформатором: сечение по току (1.5 мм²)
+  // не выдерживает тепловой импульс короткого замыкания такой силы.
+  const tree = baseNode({
+    transformerPowerKva: 1000,
+    transformerUkPercent: 4,
+    children: [
+      { ...baseNode(), id: 'a', name: 'Близкая розетка', hasOwnLoad: true, known: 'power', knownValue: 2000, cableLength: 2, children: [] },
+    ],
+  });
+  const calc = annotateShortCircuit(tree, calculateTree(tree));
+  const warnings = collectSchemeWarnings(calc);
+  // У корня тоже нулевая длина своей линии (точка ввода у самих зажимов трансформатора) —
+  // там ток КЗ ещё больше, поэтому замечание ожидаемо есть и у него; здесь же проверяем,
+  // что оно есть и у дочернего узла со своей (короткой) линией от родителя.
+  const thermal = warnings.find((w) => w.category === 'thermal' && w.nodeId === 'a');
+  assert.ok(thermal, 'ожидается замечание о термостойкости кабеля при КЗ');
+  assert.equal(thermal.severity, 'warn');
+});

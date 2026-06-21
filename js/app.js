@@ -1605,18 +1605,30 @@ function renderNodeResult(node) {
   nodeResShortCircuit.textContent = '';
   nodeResShortCircuit.classList.remove('warn');
   if (calc.shortCircuit) {
-    const { i3, i1, curve, disconnection } = calc.shortCircuit;
+    const { i3, i1, curve, disconnection, thermalCheck } = calc.shortCircuit;
     let text =
       `Приближённая оценка тока КЗ в этой точке: Iкз(3) ≈ ${formatShortCircuitCurrent(i3)}, Iкз(1) ≈ ` +
       `${formatShortCircuitCurrent(i1)} (сопротивление кабелей выше по дереву накоплено от трансформатора; ` +
       'индуктивные составляющие и сопротивление выше трансформатора не учитываются).';
+    let warn = false;
     if (disconnection) {
       text += disconnection.ok
         ? ` ✓ При характеристике ${curve} отключение заведомо быстрее нормативных 0,4 с / 0,2 с.`
         : ` ✗ При характеристике ${curve} быстрое отключение не гарантировано — см. мини-калькулятор КЗ на ` +
           'вкладке «Справка».';
-      nodeResShortCircuit.classList.toggle('warn', !disconnection.ok);
+      warn = warn || !disconnection.ok;
     }
+    if (thermalCheck) {
+      text += thermalCheck.ok
+        ? ` ✓ Термическая стойкость кабеля при КЗ обеспечена (мин. сечение по нагреву ` +
+          `${thermalCheck.minSection.toFixed(2)} мм² ≤ фактического ${thermalCheck.actualSection} мм², ` +
+          `время отключения принято ${thermalCheck.time} с).`
+        : ` ✗ Термическая стойкость кабеля при КЗ не обеспечена: по нагреву требуется сечение не менее ` +
+          `${thermalCheck.minSection.toFixed(2)} мм² (сейчас ${thermalCheck.actualSection} мм², время ` +
+          `отключения принято ${thermalCheck.time} с) — увеличьте сечение или ускорьте отключение.`;
+      warn = warn || !thermalCheck.ok;
+    }
+    nodeResShortCircuit.classList.toggle('warn', warn);
     nodeResShortCircuit.textContent = text;
   }
 }
