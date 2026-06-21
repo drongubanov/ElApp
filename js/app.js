@@ -131,6 +131,7 @@ const networkTreeWrapperEl = document.getElementById('network-tree-wrapper');
 const netZoomOutBtn = document.getElementById('net-zoom-out-btn');
 const netZoomInBtn = document.getElementById('net-zoom-in-btn');
 const netZoomResetBtn = document.getElementById('net-zoom-reset-btn');
+const netZoomFitBtn = document.getElementById('net-zoom-fit-btn');
 const calcNetworkBtn = document.getElementById('calc-network-btn');
 const undoNetworkBtn = document.getElementById('undo-network-btn');
 const heatmapToggleBtn = document.getElementById('heatmap-toggle-btn');
@@ -280,6 +281,39 @@ function setTreeZoom(value) {
 netZoomInBtn.addEventListener('click', () => setTreeZoom(treeZoom + TREE_ZOOM_STEP));
 netZoomOutBtn.addEventListener('click', () => setTreeZoom(treeZoom - TREE_ZOOM_STEP));
 netZoomResetBtn.addEventListener('click', () => setTreeZoom(1));
+
+// «Вписать в экран»: масштаб подбирается так, чтобы всё дерево (включая самые
+// широкие/глубокие ветви) уместилось в видимую область без горизонтальной и
+// вертикальной прокрутки. offsetWidth/offsetHeight у .net-tree не зависят от
+// CSS transform (transform — чисто визуальное искажение поверх layout-бокса),
+// поэтому это «природный» размер дерева при масштабе 100%, от которого и
+// считаем нужный коэффициент. Округляем вниз до шага зума, чтобы дерево не
+// перекрывало края даже при округлении.
+netZoomFitBtn.addEventListener('click', () => {
+  const naturalWidth = networkTreeEl.offsetWidth;
+  const naturalHeight = networkTreeEl.offsetHeight;
+  if (!naturalWidth || !naturalHeight) return;
+
+  networkTreeWrapperEl.scrollIntoView({ block: 'start' });
+  const wrapperRect = networkTreeWrapperEl.getBoundingClientRect();
+  const availableWidth = networkTreeWrapperEl.clientWidth - 16;
+  const availableHeight = window.innerHeight - wrapperRect.top - 24;
+
+  const rawScale = Math.min(availableWidth / naturalWidth, availableHeight / naturalHeight);
+
+  // Когда дерево шире wrapper'а, его layout-бокс начинается у левого края
+  // wrapper'а и тянется вправо (min-width: max-content) — transform-origin
+  // «top center» масштабирует его вокруг СВОЕЙ середины, а не середины
+  // видимой области, поэтому после уменьшения масштаба дерево может остаться
+  // смещённым и вылезать за правый край. Отключаем transition для точного
+  // синхронного замера новой геометрии и довыравниваем прокруткой по центру.
+  const prevTransition = networkTreeEl.style.transition;
+  networkTreeEl.style.transition = 'none';
+  setTreeZoom(Math.floor(rawScale * 10) / 10);
+  const treeRect = networkTreeEl.getBoundingClientRect();
+  networkTreeWrapperEl.scrollLeft += treeRect.left + treeRect.width / 2 - (wrapperRect.left + wrapperRect.width / 2);
+  networkTreeEl.style.transition = prevTransition;
+});
 
 // Колесо мыши с Ctrl/⌘ — зум к курсору (а не к центру дерева); также перехватывает
 // pinch-жест трекпада, который браузер сообщает как wheel-событие с ctrlKey=true.
