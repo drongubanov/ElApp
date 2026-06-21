@@ -533,6 +533,7 @@ function buildDefaultTree() {
     children: [
       createNode({
         name: 'Освещение',
+        kind: 'lighting',
         networkType: NETWORK_TYPES.AC1,
         voltage: 220,
         knownValue: 1000,
@@ -848,6 +849,50 @@ function nodeTag(node) {
   if (node.children.length) return 'Щит';
   return 'Нагрузка';
 }
+
+// Визуальный тип узла для иконки на карточке. Структура важнее сохранённого
+// kind: узел с дочерними — это всегда щит, даже если создавался по шаблону
+// потребителя; двигатель определяется по load, поэтому работает и для старых
+// схем без поля kind. Освещение и розеточную группу электрически не отличить,
+// поэтому для них опираемся на сохранённый при создании по шаблону kind, а без
+// него показываем обобщённую иконку нагрузки.
+function nodeKind(node) {
+  if (networkTree && node.id === networkTree.id) return 'input';
+  if (node.children.length) return 'panel';
+  if (node.loadType === 'motor' || node.kind === 'motor') return 'motor';
+  if (node.kind === 'lighting') return 'lighting';
+  if (node.kind === 'socket') return 'socket';
+  return 'load';
+}
+
+// Иконки типов узлов — компактные inline-SVG на currentColor, чтобы наследовать
+// цвет/тему и масштаб шрифта. stroke-обводка для единообразия с остальными
+// глифами интерфейса; «ввод» залит, чтобы читаться как акцентный источник.
+const NODE_KIND_ICON_PATHS = {
+  input: '<path d="M8.5 1.5 3.5 9H7l-.5 5.5L12.5 7H9l-.5-5.5Z" fill="currentColor" stroke="none"/>',
+  panel:
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="1.5"/><line x1="5" y1="5.5" x2="11" y2="5.5"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="10.5" x2="11" y2="10.5"/>',
+  motor: '<circle cx="8" cy="8" r="6"/><path d="M5.5 10.5V6l2.5 3 2.5-3v4.5"/>',
+  lighting:
+    '<path d="M5 7.5a3 3 0 1 1 6 0c0 1.2-.8 1.9-1.3 2.6-.3.4-.4.7-.4 1.2H6.7c0-.5-.1-.8-.4-1.2C5.8 9.4 5 8.7 5 7.5Z"/><line x1="6.7" y1="13.5" x2="9.3" y2="13.5"/>',
+  socket:
+    '<rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><circle cx="6.3" cy="8" r="0.9"/><circle cx="9.7" cy="8" r="0.9"/>',
+  load: '<rect x="3" y="4.5" width="10" height="9" rx="2"/><line x1="6" y1="2" x2="6" y2="4.5"/><line x1="10" y1="2" x2="10" y2="4.5"/>',
+};
+
+function nodeKindIconSvg(kind) {
+  const inner = NODE_KIND_ICON_PATHS[kind] || NODE_KIND_ICON_PATHS.load;
+  return `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${inner}</svg>`;
+}
+
+const NODE_KIND_TITLES = {
+  input: 'Ввод питания',
+  panel: 'Распределительный щит',
+  motor: 'Электродвигатель',
+  lighting: 'Освещение',
+  socket: 'Розеточная группа',
+  load: 'Потребитель',
+};
 
 function nodeMeta(node) {
   if (node.hasOwnLoad) return `${NETWORK_SHORT_LABELS[node.networkType] ?? ''} ${node.voltage} В`;
@@ -1295,7 +1340,17 @@ function renderNodeEl(node) {
 
   const tag = document.createElement('span');
   tag.className = 'net-node-tag';
-  tag.textContent = nodeTag(node);
+  const kind = nodeKind(node);
+  tag.dataset.kind = kind;
+  const tagIcon = document.createElement('span');
+  tagIcon.className = 'net-node-kind-icon';
+  tagIcon.title = NODE_KIND_TITLES[kind] || NODE_KIND_TITLES.load;
+  tagIcon.setAttribute('aria-hidden', 'true');
+  tagIcon.innerHTML = nodeKindIconSvg(kind);
+  const tagText = document.createElement('span');
+  tagText.className = 'net-node-tag-text';
+  tagText.textContent = nodeTag(node);
+  tag.append(tagIcon, tagText);
 
   const toolbar = document.createElement('div');
   toolbar.className = 'net-node-toolbar';
