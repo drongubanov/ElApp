@@ -1375,7 +1375,7 @@ input:focus {
   font: inherit;
   text-align: center;
   cursor: pointer;
-  transition: border-color 0.15s, transform 0.1s;
+  transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
 }
 
 /* Бейдж проверок — цветная точка в углу карточки. Кликабельна: ведёт к
@@ -1412,8 +1412,15 @@ input:focus {
   outline: none;
 }
 
+/* Иерархия состояний карточки строится по нарастанию выразительности:
+   hover — лёгкий «подъём» (граница + тень, без кольца);
+   selected — единственный активный узел: сплошное яркое кольцо + свечение;
+   multi-selected — член группового выбора: пунктирная граница + матовое кольцо.
+   Так наведение, активный выбор и групповой выбор не путаются между собой. */
 .net-node:hover {
   border-color: var(--color-accent);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
 }
 
 .net-node:active {
@@ -1427,18 +1434,30 @@ input:focus {
 
 .net-node.selected {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 1px var(--color-accent);
+  box-shadow:
+    0 0 0 2px var(--color-accent),
+    0 6px 18px rgba(245, 158, 11, 0.28);
 }
 
 .net-node.has-error {
   border-color: var(--color-danger);
 }
 
-/* Узлы во множественном выборе (Ctrl+клик) — пунктирная акцентная рамка. */
+/* Узлы во множественном выборе (Ctrl+клик) — пунктирная граница и матовое
+   кольцо, чтобы группа читалась иначе, чем один активный узел. */
 .net-node.multi-selected {
   border-style: dashed;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 1px var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.5);
+}
+
+/* Главный (последний выбранный) узел внутри группы сохраняет яркое сплошное
+   кольцо и свечение, оставаясь пунктирным членом группы — так видно, какой из
+   выбранных узлов первичный. */
+.net-node.multi-selected.selected {
+  box-shadow:
+    0 0 0 2px var(--color-accent),
+    0 6px 18px rgba(245, 158, 11, 0.28);
 }
 
 .net-node[draggable='true'] {
