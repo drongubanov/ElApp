@@ -181,6 +181,31 @@ input:focus {
   color: var(--color-text-muted);
 }
 
+/* Крупные под-секции панели параметров (Нагрузка / Защита и КЗ / Кабель / Фазы)
+   — их заголовки выделены как разделы, а не как подписи поля. */
+.net-panel > .field-group > legend {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* Вложенные группы внутри «Нагрузки» (реальная нагрузка и пусковой ток, группа
+   приёмников) — без собственной рамки, чтобы не было двойного обрамления:
+   отделяются тонкой линией, заголовок служит подзаголовком. */
+.net-panel #node-load-fields .field-group {
+  flex-basis: 100%;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+  padding: 12px 0 0;
+  margin: 6px 0;
+}
+
+.net-panel #node-load-fields .field-group > legend {
+  padding: 0 8px 0 0;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
 /* --- Сворачиваемые секции конструктора (проекты, версии) ------------------ */
 .net-section {
   border: 1px solid var(--color-border);
