@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { collectSchemeWarnings } from '../js/schemeWarnings.js';
-import { calculateTree, annotateShortCircuit } from '../js/network.js';
+import { calculateTree, annotateShortCircuit, annotateVoltageDrop } from '../js/network.js';
 import { NETWORK_TYPES } from '../js/calculations.js';
 
 function baseNode(overrides = {}) {
@@ -74,7 +74,8 @@ test('collectSchemeWarnings: превышение потери напряжен�
       },
     ],
   });
-  const warnings = collectSchemeWarnings(calculateTree(tree));
+  const calc = annotateVoltageDrop(tree, calculateTree(tree));
+  const warnings = collectSchemeWarnings(calc);
   const drop = warnings.find((w) => w.category === 'voltage-drop');
   assert.ok(drop, 'ожидается замечание о потере напряжения');
   assert.equal(drop.nodeId, 'long');

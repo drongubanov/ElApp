@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateNode, calculateLineVoltageDrop, calculateTree, annotateShortCircuit } from '../js/network.js';
+import { calculateNode, calculateLineVoltageDrop, calculateTree, annotateShortCircuit, annotateVoltageDrop } from '../js/network.js';
 import { NETWORK_TYPES } from '../js/calculations.js';
 
 test('calculateNode считает ток и подбирает защиту листового узла', () => {
@@ -452,4 +452,64 @@ test('annotateShortCircuit: проверка отключения по хара�
   const leaf = calc.children[0];
   assert.ok(leaf.shortCircuit.disconnection);
   assert.equal(typeof leaf.shortCircuit.disconnection.ok, 'boolean');
+});
+
+test('annotateVoltageDrop: суммирует потерю напряжения по сегментам от точки ввода до узла', () => {
+  const tree = baseNode({
+    cableLength: 5,
+    children: [
+      {
+        ...baseNode(),
+        id: 'mid',
+        name: 'Щит 2',
+        hasOwnLoad: false,
+        cableLength: 20,
+        children: [
+          { ...baseNode(), id: 'leaf', hasOwnLoad: true, known: 'power', knownValue: 5000, cableLength: 30, children: [] },
+        ],
+      },
+    ],
+  });
+  const calc = calculateTree(tree);
+  annotateVoltageDrop(tree, calc);
+  const mid = calc.children[0];
+  const leaf = mid.children[0];
+
+  assert.ok(Math.abs(calc.cumulativeVoltageDropPercent - calc.voltageDrop.dropPercent) < 1e-9);
+  assert.ok(Math.abs(mid.cumulativeVoltageDropPercent - (calc.voltageDrop.dropPercent + mid.voltageDrop.dropPercent)) < 1e-9);
+  assert.ok(
+    Math.abs(
+      leaf.cumulativeVoltageDropPercent -
+        (calc.voltageDrop.dropPercent + mid.voltageDrop.dropPercent + leaf.voltageDrop.dropPercent),
+    ) < 1e-9,
+  );
+  assert.ok(leaf.cumulativeVoltageDropPercent > leaf.voltageDrop.dropPercent);
+});
+
+test('annotateVoltageDrop: ошибка узла не блокирует накопление в исправном поддереве ниже по дереву', () => {
+  const tree = baseNode({
+    children: [
+      {
+        ...baseNode(),
+        id: 'mid',
+        name: 'Щит 2',
+        hasOwnLoad: false,
+        simultaneityFactor: 1.5, // некорректное значение — calculateNode выбросит ошибку
+        children: [
+          { ...baseNode(), id: 'leaf', hasOwnLoad: true, known: 'power', knownValue: 5000, cableLength: 30, children: [] },
+        ],
+      },
+    ],
+  });
+  const calc = calculateTree(tree);
+  annotateVoltageDrop(tree, calc);
+  const mid = calc.children[0];
+  const leaf = mid.children[0];
+
+  assert.ok(calc.error);
+  assert.ok(mid.error);
+  assert.equal(calc.cumulativeVoltageDropPercent, null);
+  assert.equal(mid.cumulativeVoltageDropPercent, null);
+  assert.equal(leaf.error, null);
+  assert.ok(Math.abs(leaf.cumulativeVoltageDropPercent - leaf.voltageDrop.dropPercent) < 1e-9);
 });

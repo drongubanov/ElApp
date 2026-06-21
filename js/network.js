@@ -254,3 +254,30 @@ export function annotateShortCircuit(rootNode, rootCalc) {
   walk(rootNode, rootCalc, 0);
   return rootCalc;
 }
+
+/**
+ * Дополняет результат calculateTree накопленной потерей напряжения от точки
+ * ввода до узла — суммой dropPercent всех линий по пути от корня, а не только
+ * последней (calc.voltageDrop учитывает лишь линию, питающую узел от
+ * родителя). Именно суммарную потерю у самого удалённого потребителя сравнивают
+ * с общепринятой нормой ≤5% (ПУЭ, ГОСТ 32144) — потеря на одном участке может
+ * быть в норме, а итоговая до конечного приёмника — превышать её. Суммирование
+ * процентов, а не вольт, позволяет складывать потери на участках с разным
+ * напряжением (например, ввод 380 В и однофазный отвод 220 В) — стандартное
+ * инженерное приближение, не учитывающее приведение фаз к общему вектору.
+ * У узла с ошибкой расчёта собственная линия не подобрана, поэтому её вклад
+ * принимается равным нулю (как сопротивление кабеля в annotateShortCircuit) —
+ * накопление продолжается дальше по дереву без искусственной блокировки
+ * поддерева, а cumulativeVoltageDropPercent самого этого узла — null.
+ */
+export function annotateVoltageDrop(rootNode, rootCalc) {
+  const walk = (node, calcNode, parentDropPercent) => {
+    const ownDropPercent = calcNode.voltageDrop?.dropPercent ?? 0;
+    const cumulative = parentDropPercent + ownDropPercent;
+    calcNode.cumulativeVoltageDropPercent = calcNode.result && !calcNode.error ? cumulative : null;
+    node.children.forEach((child, index) => walk(child, calcNode.children[index], cumulative));
+  };
+
+  walk(rootNode, rootCalc, 0);
+  return rootCalc;
+}
