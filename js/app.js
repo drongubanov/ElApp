@@ -116,6 +116,10 @@ const historyEmpty = document.getElementById('history-empty');
 const clearHistoryBtn = document.getElementById('clear-history-btn');
 
 const networkTreeEl = document.getElementById('network-tree');
+const networkTreeWrapperEl = document.getElementById('network-tree-wrapper');
+const netZoomOutBtn = document.getElementById('net-zoom-out-btn');
+const netZoomInBtn = document.getElementById('net-zoom-in-btn');
+const netZoomResetBtn = document.getElementById('net-zoom-reset-btn');
 const calcNetworkBtn = document.getElementById('calc-network-btn');
 const undoNetworkBtn = document.getElementById('undo-network-btn');
 const heatmapToggleBtn = document.getElementById('heatmap-toggle-btn');
@@ -241,6 +245,61 @@ tabButtons.forEach((btn) => {
 });
 
 window.addEventListener('resize', () => drawConnectors());
+
+// Масштаб дерева конструктора: CSS-трансформация всего .net-tree (узлы и SVG-слой
+// линий масштабируются вместе как один слой) — линии пересчитываются заново из
+// getBoundingClientRect, который уже учитывает масштаб, так что отдельной
+// геометрии для зума не нужно.
+const TREE_ZOOM_MIN = 0.4;
+const TREE_ZOOM_MAX = 2;
+const TREE_ZOOM_STEP = 0.1;
+
+function setTreeZoom(value) {
+  treeZoom = Math.min(TREE_ZOOM_MAX, Math.max(TREE_ZOOM_MIN, Math.round(value * 10) / 10));
+  networkTreeEl.style.transform = treeZoom === 1 ? '' : `scale(${treeZoom})`;
+  netZoomResetBtn.textContent = `${Math.round(treeZoom * 100)}%`;
+  netZoomOutBtn.disabled = treeZoom <= TREE_ZOOM_MIN;
+  netZoomInBtn.disabled = treeZoom >= TREE_ZOOM_MAX;
+  requestAnimationFrame(() => drawConnectors());
+}
+
+netZoomInBtn.addEventListener('click', () => setTreeZoom(treeZoom + TREE_ZOOM_STEP));
+netZoomOutBtn.addEventListener('click', () => setTreeZoom(treeZoom - TREE_ZOOM_STEP));
+netZoomResetBtn.addEventListener('click', () => setTreeZoom(1));
+
+// Перемещение по дереву зажатой левой кнопкой мыши (pan) — полезно при увеличенном
+// масштабе или широкой схеме. Не перехватывает клики по узлам, кнопкам и другим
+// интерактивным элементам, чтобы не мешать их собственным обработчикам (выбор
+// узла, drag-and-drop переноса узла, кнопки панели).
+let isPanningTree = false;
+let panStartX = 0;
+let panStartY = 0;
+let panStartScrollLeft = 0;
+let panStartScrollTop = 0;
+
+networkTreeWrapperEl.addEventListener('mousedown', (event) => {
+  if (event.button !== 0) return;
+  if (event.target.closest('.net-node, button, input, select, textarea, a')) return;
+  isPanningTree = true;
+  networkTreeWrapperEl.classList.add('is-panning');
+  panStartX = event.clientX;
+  panStartY = event.clientY;
+  panStartScrollLeft = networkTreeWrapperEl.scrollLeft;
+  panStartScrollTop = window.scrollY;
+  event.preventDefault();
+});
+
+window.addEventListener('mousemove', (event) => {
+  if (!isPanningTree) return;
+  networkTreeWrapperEl.scrollLeft = panStartScrollLeft - (event.clientX - panStartX);
+  window.scrollTo(window.scrollX, panStartScrollTop - (event.clientY - panStartY));
+});
+
+window.addEventListener('mouseup', () => {
+  if (!isPanningTree) return;
+  isPanningTree = false;
+  networkTreeWrapperEl.classList.remove('is-panning');
+});
 
 function updateNetworkTypeUI() {
   const type = networkTypeSelect.value;
@@ -371,6 +430,7 @@ let searchPathIds = new Set();
 let addMenuParentId = null;
 let addMenuAnchor = null;
 let heatMapEnabled = false;
+let treeZoom = 1;
 
 const UNDO_LIMIT = 20;
 let undoStack = [];

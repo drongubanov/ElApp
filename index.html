@@ -342,7 +342,12 @@
       </div>
 
       <div class="net-workspace">
-        <div class="net-tree-wrapper">
+        <div class="net-tree-wrapper" id="network-tree-wrapper">
+          <div class="net-zoom-controls" role="group" aria-label="Масштаб дерева">
+            <button type="button" id="net-zoom-out-btn" class="net-zoom-btn" title="Уменьшить масштаб">−</button>
+            <button type="button" id="net-zoom-reset-btn" class="net-zoom-btn net-zoom-level" title="Сбросить масштаб до 100%">100%</button>
+            <button type="button" id="net-zoom-in-btn" class="net-zoom-btn" title="Увеличить масштаб">+</button>
+          </div>
           <ul class="net-tree" id="network-tree"></ul>
         </div>
 
