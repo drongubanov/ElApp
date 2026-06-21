@@ -631,11 +631,18 @@ input:focus {
   color: var(--color-accent);
 }
 
+/* Меню раскрывается по содержимому (самый длинный пункт), но не уже кнопки —
+   иначе длинные подписи вроде «Спецификация оборудования в CSV» вылезали за
+   правую границу выпадающего списка. Прижато к правому краю кнопки, чтобы при
+   расширении влево оно не уходило за край экрана. */
 .net-export-dropdown {
   position: absolute;
   top: calc(100% + 4px);
-  left: 0;
   right: 0;
+  left: auto;
+  min-width: 100%;
+  width: max-content;
+  max-width: min(320px, 90vw);
   z-index: 20;
   display: flex;
   flex-direction: column;
@@ -1144,31 +1151,6 @@ input:focus {
   font-variant-numeric: tabular-nums;
 }
 
-/* На широких экранах — две колонки: слева дерево (горизонтально прокручивается),
-   справа «липкая» панель параметров узла, чтобы выбор узла не требовал скролла
-   вниз. На узких экранах блоки складываются друг под другом (по умолчанию). */
-@media (min-width: 1100px) {
-  .net-workspace {
-    display: flex;
-    align-items: flex-start;
-    gap: 20px;
-  }
-
-  .net-workspace .net-tree-wrapper {
-    flex: 1 1 auto;
-    min-width: 0;
-    margin-bottom: 0;
-  }
-
-  .net-workspace .net-panel {
-    flex: 0 0 380px;
-    position: sticky;
-    top: 16px;
-    max-height: calc(100vh - 32px);
-    overflow-y: auto;
-  }
-}
-
 .net-tree,
 .net-tree ul {
   display: flex;
@@ -1429,12 +1411,26 @@ input:focus {
   color: var(--color-accent);
 }
 
+/* Панель параметров узла теперь живёт внутри сворачиваемой секции
+   .net-panel-section — рамку, фон и внешние отступы даёт сама секция,
+   поэтому у самой панели они убраны, чтобы не было двойной рамки. */
 .net-panel {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 16px;
-  margin-bottom: 18px;
+  padding: 0;
+}
+
+/* Имя выбранного узла в заголовке сворачиваемой секции «Параметры узла». */
+.net-panel-summary-name {
+  margin-left: 4px;
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.net-panel-summary-name::before {
+  content: '— ';
+}
+
+.net-panel-summary-name:empty {
+  display: none;
 }
 
 .net-panel-header h3 {
@@ -1667,11 +1663,7 @@ input:focus {
     flex: 1 1 100%;
   }
 
-  /* Панель параметров узла: меньше внутренних отступов, поля во всю ширину. */
-  .net-panel {
-    padding: 12px;
-  }
-
+  /* Панель параметров узла: поля во всю ширину (внешние отступы даёт секция). */
   .net-panel select,
   .net-panel input[type='number'] {
     max-width: none;
