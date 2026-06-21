@@ -558,6 +558,7 @@ let selectedNodeId = null;
 let selectedNodeIds = new Set();
 let lastCalcMap = null;
 let lastResultTree = null;
+let warningsByNode = new Map(); // nodeId -> массив замечаний для бейджа-точки на карточке
 let activeProjectId = null;
 let draggedNodeId = null;
 let searchQuery = '';
@@ -687,6 +688,28 @@ function revealNode(nodeId) {
     networkTreeEl
       .querySelector(`.net-node-wrap[data-id="${nodeId}"]`)
       ?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+  });
+}
+
+/**
+ * Обратная навигация к замечанию: по клику на бейдж-точку карточки прокручивает
+ * к сводной панели проверок и подсвечивает пункты выбранного узла. Сбрасывает
+ * активный фильтр, чтобы нужное замечание точно присутствовало в списке.
+ */
+function revealWarning(nodeId) {
+  if (networkWarnings.hidden) return;
+  if (activeWarningFilter) {
+    activeWarningFilter = null;
+    renderWarnings();
+  }
+  networkWarnings.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  requestAnimationFrame(() => {
+    const items = netWarningsList.querySelectorAll(`.net-warning-item[data-node-id="${nodeId}"]`);
+    items.forEach((item) => {
+      item.classList.remove('flash');
+      void item.offsetWidth; // перезапуск анимации, если точку нажали повторно
+      item.classList.add('flash');
+    });
   });
 }
 
@@ -1427,11 +1450,25 @@ function renderNodeEl(node) {
     card.appendChild(badge);
   }
 
-  if (calc?.balance) {
-    const balanceBadge = document.createElement('span');
-    balanceBadge.className = 'net-node-badge caution';
-    balanceBadge.textContent = '⚠ баланс нагрузки';
-    card.appendChild(balanceBadge);
+  // Бейдж проверок — цветная точка в углу карточки, если по узлу есть замечания
+  // (любой категории: баланс, потеря напряжения, КЗ, перекос фаз, селективность,
+  // ошибка расчёта). Клик ведёт к этому замечанию в сводной панели проверок.
+  const nodeWarnings = warningsByNode.get(node.id);
+  if (nodeWarnings && nodeWarnings.length) {
+    const hasError = nodeWarnings.some((w) => w.severity === 'error');
+    const dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = 'net-node-check-dot';
+    dot.dataset.severity = hasError ? 'error' : 'warn';
+    if (nodeWarnings.length > 1) dot.textContent = String(nodeWarnings.length);
+    dot.title = nodeWarnings.map((w) => `• ${w.message}`).join('\n');
+    const word = pluralize(nodeWarnings.length, 'замечание', 'замечания', 'замечаний');
+    dot.setAttribute('aria-label', `${nodeWarnings.length} ${word} по узлу — открыть в сводке проверок`);
+    dot.addEventListener('click', (event) => {
+      event.stopPropagation();
+      revealWarning(node.id);
+    });
+    card.appendChild(dot);
   }
 
   card.addEventListener('click', (event) => {
@@ -1459,6 +1496,18 @@ function renderNodeEl(node) {
 function renderTree() {
   networkTreeEl.innerHTML = '';
   if (!networkTree) return;
+
+  // Группируем замечания по узлам для бейджа-точки на карточках. Источник — то
+  // же дерево результатов, что и у сводной панели проверок, поэтому точка на
+  // карточке и пункт в сводке всегда согласованы.
+  warningsByNode = new Map();
+  if (lastResultTree) {
+    collectSchemeWarnings(lastResultTree).forEach((w) => {
+      const list = warningsByNode.get(w.nodeId);
+      if (list) list.push(w);
+      else warningsByNode.set(w.nodeId, [w]);
+    });
+  }
 
   if (searchQuery) {
     const { matchIds, pathIds } = computeSearchSets(searchQuery);
@@ -1557,6 +1606,7 @@ function renderWarnings() {
   visibleWarnings.forEach((warning) => {
     const li = document.createElement('li');
     li.className = `net-warning-item ${warning.severity}`;
+    li.dataset.nodeId = warning.nodeId;
     li.setAttribute('role', 'button');
     li.tabIndex = 0;
 
