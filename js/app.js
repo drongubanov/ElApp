@@ -132,6 +132,8 @@ const netZoomOutBtn = document.getElementById('net-zoom-out-btn');
 const netZoomInBtn = document.getElementById('net-zoom-in-btn');
 const netZoomResetBtn = document.getElementById('net-zoom-reset-btn');
 const netZoomFitBtn = document.getElementById('net-zoom-fit-btn');
+const netMinimap = document.getElementById('net-minimap');
+const netMinimapThumb = document.getElementById('net-minimap-thumb');
 const calcNetworkBtn = document.getElementById('calc-network-btn');
 const undoNetworkBtn = document.getElementById('undo-network-btn');
 const heatmapToggleBtn = document.getElementById('heatmap-toggle-btn');
@@ -1622,7 +1624,42 @@ function drawConnectors() {
   });
 
   currentMarks.forEach((mark) => svg.appendChild(mark));
+  updateMinimap();
 }
+
+/**
+ * Индикатор «вы здесь»: показывает видимую долю широкого дерева и её
+ * положение по горизонтали. scrollWidth/clientWidth здесь не годятся —
+ * scrollWidth не уменьшается вместе с transform: scale() (масштаб дерева),
+ * поэтому видимую долю считаем через getBoundingClientRect (отражает
+ * реальный, уже отмасштабированный размер) дерева и пересечение с
+ * видимой областью wrapper'а.
+ */
+function updateMinimap() {
+  const treeRect = networkTreeEl.getBoundingClientRect();
+  const wrapperRect = networkTreeWrapperEl.getBoundingClientRect();
+  if (!treeRect.width || treeRect.width <= wrapperRect.width + 1) {
+    netMinimap.hidden = true;
+    return;
+  }
+
+  const visibleLeft = Math.max(treeRect.left, wrapperRect.left);
+  const visibleRight = Math.min(treeRect.right, wrapperRect.right);
+  const visibleWidth = Math.max(0, visibleRight - visibleLeft);
+
+  netMinimap.hidden = false;
+  netMinimapThumb.style.width = `${Math.max(0, (visibleWidth / treeRect.width) * 100)}%`;
+  netMinimapThumb.style.left = `${Math.min(100, Math.max(0, ((visibleLeft - treeRect.left) / treeRect.width) * 100))}%`;
+}
+
+networkTreeWrapperEl.addEventListener('scroll', () => updateMinimap());
+window.addEventListener('resize', () => updateMinimap());
+// Клик по кнопкам зума (+/−/100%) меняет transform с CSS-transition (0.15s) —
+// геометрия на момент rAF в setTreeZoom ещё промежуточная, поэтому уточняем
+// индикатор повторно, когда transition действительно закончится.
+networkTreeEl.addEventListener('transitionend', (event) => {
+  if (event.propertyName === 'transform') updateMinimap();
+});
 
 // Компактное представление тока для надписи внутри кружка на линии —
 // без единицы измерения (не помещается рядом с числом в круге малого
