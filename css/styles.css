@@ -716,6 +716,41 @@ input:focus {
   box-shadow: 0 0 0 2px var(--color-accent);
 }
 
+/* --- Легенда тепловой карты нагрузки --------------------------------------- */
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.heatmap-legend[hidden] {
+  display: none;
+}
+
+.heatmap-legend-caption {
+  white-space: nowrap;
+}
+
+.heatmap-legend-value {
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.heatmap-legend-bar {
+  flex: 1 1 auto;
+  min-width: 80px;
+  height: 10px;
+  border-radius: 5px;
+}
+
 /* --- Меню добавления узла (пустой узел + шаблоны) -------------------------- */
 .net-add-menu {
   position: fixed;
