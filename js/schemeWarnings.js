@@ -1,7 +1,8 @@
 // Сводка проверок схемы сети — собирает в один плоский список все замечания,
-// разбросанные по узлам дерева после расчёта (calculateTree + annotateShortCircuit):
-// ошибки расчёта, перегрузку по балансу нагрузки, превышение потери напряжения,
-// негарантированное время отключения при КЗ и проблемы селективности. Модуль
+// разбросанные по узлам дерева после расчёта (calculateTree + annotateShortCircuit +
+// annotateVoltageDrop): ошибки расчёта, перегрузку по балансу нагрузки, превышение
+// суммарной потери напряжения, негарантированное время отключения при КЗ и проблемы
+// селективности. Модуль
 // независим от DOM — работает с готовым деревом результатов и проверяется
 // обычными модульными тестами; визуальное представление и переход к узлу
 // реализованы в app.js.
@@ -50,15 +51,15 @@ export function collectSchemeWarnings(calcTree) {
         });
       }
 
-      if (calc.voltageDrop && calc.voltageDrop.dropPercent > VOLTAGE_DROP_LIMIT_PERCENT) {
+      if (calc.cumulativeVoltageDropPercent != null && calc.cumulativeVoltageDropPercent > VOLTAGE_DROP_LIMIT_PERCENT) {
         warnings.push({
           nodeId: calc.id,
           nodeName: calc.name,
           severity: 'warn',
           category: 'voltage-drop',
           message:
-            `Потеря напряжения ${calc.voltageDrop.dropPercent.toFixed(2)}% превышает норму ` +
-            `≤${VOLTAGE_DROP_LIMIT_PERCENT}% — увеличьте сечение кабеля.`,
+            `Суммарная потеря напряжения от точки ввода ${calc.cumulativeVoltageDropPercent.toFixed(2)}% превышает ` +
+            `норму ≤${VOLTAGE_DROP_LIMIT_PERCENT}% — увеличьте сечение кабеля на этом или предыдущих участках.`,
         });
       }
 

@@ -8,7 +8,7 @@ import {
   SELECTIVITY_SAFE_RATIO,
 } from './tables.js';
 import { calculateShortCircuit, checkDisconnectionByCurve } from './shortCircuit.js';
-import { calculateTree, annotateShortCircuit, DEFAULT_START_CURRENT_RATIO } from './network.js';
+import { calculateTree, annotateShortCircuit, annotateVoltageDrop, DEFAULT_START_CURRENT_RATIO } from './network.js';
 import { loadNetworkScheme, saveNetworkScheme } from './networkStorage.js';
 import { loadProjects, getProject, saveProject, deleteProject } from './networkProjects.js';
 import { loadSnapshots, getSnapshot, saveSnapshot, deleteSnapshot } from './schemeSnapshots.js';
@@ -1550,13 +1550,18 @@ function renderNodeResult(node) {
   nodeResVoltageDrop.textContent = '';
   nodeResVoltageDrop.classList.remove('warn');
   if (voltageDrop) {
-    const withinLimit = voltageDrop.dropPercent <= VOLTAGE_DROP_LIMIT_PERCENT;
     const materialLabel = voltageDrop.material === 'copper' ? 'медь' : 'алюминий';
-    nodeResVoltageDrop.textContent =
+    let text =
       `Потеря напряжения на линии ${node.cableLength} м (сечение ${voltageDrop.section} мм², ${materialLabel}): ` +
-      `${voltageDrop.drop.toFixed(2)} В (${voltageDrop.dropPercent.toFixed(2)}%) — ` +
-      `${withinLimit ? 'в пределах общепринятой нормы (≤5%)' : 'превышает общепринятую норму (≤5%), увеличьте сечение'}.`;
-    nodeResVoltageDrop.classList.toggle('warn', !withinLimit);
+      `${voltageDrop.drop.toFixed(2)} В (${voltageDrop.dropPercent.toFixed(2)}%).`;
+    if (calc.cumulativeVoltageDropPercent != null) {
+      const withinLimit = calc.cumulativeVoltageDropPercent <= VOLTAGE_DROP_LIMIT_PERCENT;
+      text +=
+        ` Суммарно от точки ввода: ${calc.cumulativeVoltageDropPercent.toFixed(2)}% — ` +
+        `${withinLimit ? 'в пределах общепринятой нормы (≤5%)' : 'превышает общепринятую норму (≤5%), увеличьте сечение на этом или предыдущих участках'}.`;
+      nodeResVoltageDrop.classList.toggle('warn', !withinLimit);
+    }
+    nodeResVoltageDrop.textContent = text;
   }
 
   nodeResSelectivity.classList.remove('warn');
@@ -1720,7 +1725,7 @@ nodeNetworkTypeSelect.addEventListener('change', () => {
 
 calcNetworkBtn.addEventListener('click', () => {
   if (!networkTree) return;
-  const resultTree = annotateShortCircuit(networkTree, calculateTree(networkTree));
+  const resultTree = annotateVoltageDrop(networkTree, annotateShortCircuit(networkTree, calculateTree(networkTree)));
   lastResultTree = resultTree;
   lastCalcMap = flattenCalc(resultTree);
   const errors = collectErrors(resultTree);
