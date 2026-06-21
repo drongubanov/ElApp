@@ -439,6 +439,19 @@
             <label for="node-transformer-uk">Напряжение короткого замыкания, uк (%)</label>
             <input type="number" id="node-transformer-uk" inputmode="decimal" step="0.1" min="0" placeholder="напр. 4,5" />
           </div>
+          <div class="field">
+            <label for="node-earthing-system">Система заземления</label>
+            <select id="node-earthing-system">
+              <option value="TN-C-S" selected>TN-C-S</option>
+              <option value="TN-S">TN-S</option>
+              <option value="TT">TT</option>
+            </select>
+            <p class="note">
+              В системах TN отключение при замыкании на корпус обеспечивает максимально-токовая защита
+              по петле «фаза–защитный проводник»; в системе TT ток замыкания на землю мал — отключение
+              должно обеспечиваться УЗО (RCD).
+            </p>
+          </div>
         </fieldset>
 
         <fieldset class="field-group">

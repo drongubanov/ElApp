@@ -5,8 +5,19 @@
 // которого подключена напрямую, а часть — через под-щиты).
 
 import { calculate, calculateVoltageDrop, NETWORK_TYPES } from './calculations.js';
-import { recommendProtection, checkSelectivity } from './tables.js';
+import { recommendProtection, checkSelectivity, recommendPeSection } from './tables.js';
 import { transformerImpedance, cableResistance, checkDisconnectionByCurve, minThermalSection } from './shortCircuit.js';
+
+// Система заземления сети до 1 кВ (ГОСТ Р 50571.2 / ПУЭ-7 гл. 1.7). Влияет на то,
+// чем обеспечивается автоматическое отключение при замыкании на открытые
+// проводящие части: в системах TN — максимально-токовой защитой по петле
+// «фаза–защитный проводник», в системе TT ток замыкания на землю ограничен
+// сопротивлением заземлителей, и отключение должно обеспечиваться УЗО (RCD).
+export const EARTHING_SYSTEMS = {
+  TN_C_S: 'TN-C-S',
+  TN_S: 'TN-S',
+  TT: 'TT',
+};
 
 // Время отключения (с), принимаемое для проверки термической стойкости кабеля
 // при КЗ, в зависимости от того, гарантирует ли расчётный ток КЗ мгновенное
@@ -230,6 +241,14 @@ function chosenCable(protection) {
  * тепловому воздействию тока КЗ (Iкз(3), как наибольшего из двух) за принятое
  * время отключения (THERMAL_TRIP_TIME) — см. minThermalSection в
  * js/shortCircuit.js.
+ *
+ * Iкз(1) считается по петле «фаза–защитный проводник» с учётом фактического
+ * сечения PE/PEN (recommendPeSection); при сечении фазы ≤16 мм² PE равно фазному
+ * и формула совпадает с прежней Uф/(Zт + 2·Rфаз). Система заземления узла-ввода
+ * (rootNode.earthingSystem, по умолчанию TN-C-S) определяет, чем обеспечивается
+ * автоматическое отключение: в системах TN — максимально-токовой защитой по этой
+ * петле, в системе TT ток замыкания на землю мал и отключение должно
+ * обеспечиваться УЗО (disconnection.requiresRcd).
  */
 export function annotateShortCircuit(rootNode, rootCalc) {
   const { transformerPowerKva, transformerUkPercent } = rootNode;
@@ -246,38 +265,59 @@ export function annotateShortCircuit(rootNode, rootCalc) {
     return rootCalc;
   }
   const phaseVoltage = rootNode.voltage / Math.sqrt(3);
+  const earthingSystem = rootNode.earthingSystem ?? EARTHING_SYSTEMS.TN_C_S;
 
-  const walk = (node, calcNode, parentResistance) => {
+  const walk = (node, calcNode, parentResistance, parentPeResistance) => {
     const cable = chosenCable(calcNode.protection);
-    const resistance =
-      parentResistance + (cable && node.cableLength > 0
-        ? cableResistance({ length: node.cableLength, section: cable.section, material: cable.material })
-        : 0);
+    const hasSegment = cable && node.cableLength > 0;
+    // Сопротивление фазной жилы и отдельно — защитного (PE/PEN) проводника той же
+    // линии: сечение PE по ПУЭ-7 табл. 1.7.5 может быть меньше фазного, тогда
+    // петля «фаза–защитный проводник» имеет сопротивление больше, чем 2·Rфаз,
+    // и однофазный ток КЗ ниже. Для сечений ≤16 мм² PE равно фазному, и формула
+    // совпадает с прежней оценкой Iкз(1) = Uф/(Zт + 2·Rкаб).
+    const segResistance = hasSegment
+      ? cableResistance({ length: node.cableLength, section: cable.section, material: cable.material })
+      : 0;
+    const peSection = cable ? recommendPeSection(cable.section) : null;
+    const segPeResistance = hasSegment && peSection > 0
+      ? cableResistance({ length: node.cableLength, section: peSection, material: cable.material })
+      : 0;
+    const resistance = parentResistance + segResistance;
+    const peResistance = parentPeResistance + segPeResistance;
 
     if (calcNode.result && !calcNode.error) {
       const i3 = phaseVoltage / (zT + resistance);
-      const i1 = phaseVoltage / (zT + 2 * resistance);
+      const i1 = phaseVoltage / (zT + resistance + peResistance);
       const curve = calcNode.protection?.recommendedCurve ?? 'C';
-      const disconnection = calcNode.protection?.breaker
+      // Проверка мгновенного отключения по петле «фаза–защитный проводник»
+      // (для термического времени и для систем TN).
+      const tripCheck = calcNode.protection?.breaker
         ? checkDisconnectionByCurve({ singlePhaseCurrent: i1, breakerRating: calcNode.protection.breaker, curve })
         : null;
+      // В системе TT ток однофазного замыкания на землю ограничен сопротивлением
+      // заземлителей и максимально-токовой защитой за нормативное время не
+      // отключается — отключение должно обеспечиваться УЗО (RCD); петлевой Iкз(1)
+      // здесь лишь верхняя оценка и в зачёт автоматического отключения не идёт.
+      const disconnection = earthingSystem === EARTHING_SYSTEMS.TT
+        ? { requiresRcd: true }
+        : tripCheck;
 
       let thermalCheck = null;
-      if (disconnection && cable) {
-        const time = disconnection.ok ? THERMAL_TRIP_TIME.instant : THERMAL_TRIP_TIME.delayed;
+      if (tripCheck && cable) {
+        const time = tripCheck.ok ? THERMAL_TRIP_TIME.instant : THERMAL_TRIP_TIME.delayed;
         const minSection = minThermalSection({ current: i3, time, material: cable.material });
         if (minSection != null) {
           thermalCheck = { time, minSection, actualSection: cable.section, ok: cable.section >= minSection };
         }
       }
 
-      calcNode.shortCircuit = { zT, resistance, i3, i1, curve, disconnection, thermalCheck };
+      calcNode.shortCircuit = { zT, resistance, peResistance, i3, i1, curve, earthingSystem, disconnection, thermalCheck };
     }
 
-    node.children.forEach((child, index) => walk(child, calcNode.children[index], resistance));
+    node.children.forEach((child, index) => walk(child, calcNode.children[index], resistance, peResistance));
   };
 
-  walk(rootNode, rootCalc, 0);
+  walk(rootNode, rootCalc, 0, 0);
   return rootCalc;
 }
 
