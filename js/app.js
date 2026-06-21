@@ -134,6 +134,8 @@ const netZoomResetBtn = document.getElementById('net-zoom-reset-btn');
 const netZoomFitBtn = document.getElementById('net-zoom-fit-btn');
 const netMinimap = document.getElementById('net-minimap');
 const netMinimapThumb = document.getElementById('net-minimap-thumb');
+const netCanvasHint = document.getElementById('net-canvas-hint');
+const netCanvasHintClose = document.getElementById('net-canvas-hint-close');
 const calcNetworkBtn = document.getElementById('calc-network-btn');
 const undoNetworkBtn = document.getElementById('undo-network-btn');
 const heatmapToggleBtn = document.getElementById('heatmap-toggle-btn');
@@ -254,7 +256,41 @@ function switchTab(tabName) {
   if (tabName === 'network') {
     // Дерево было скрыто — пересчитываем координаты bezier-линий после показа.
     requestAnimationFrame(() => drawConnectors());
+    maybeShowCanvasHint();
   }
+}
+
+// Подсказка про pan/зум показывается один раз — при первом заходе на вкладку
+// «Конструктор сети». Флаг хранится в localStorage по принятому в проекте
+// соглашению elapp.<feature>.v1, поэтому после закрытия (кнопкой или первым
+// жестом панорамирования/зума) она больше не появляется.
+const NET_CANVAS_HINT_KEY = 'elapp.netCanvasHintDismissed.v1';
+
+function isCanvasHintDismissed() {
+  try {
+    return localStorage.getItem(NET_CANVAS_HINT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function maybeShowCanvasHint() {
+  if (!netCanvasHint || isCanvasHintDismissed()) return;
+  netCanvasHint.hidden = false;
+}
+
+function dismissCanvasHint() {
+  if (!netCanvasHint || netCanvasHint.hidden) return;
+  netCanvasHint.hidden = true;
+  try {
+    localStorage.setItem(NET_CANVAS_HINT_KEY, '1');
+  } catch {
+    /* приватный режим / переполнение — просто скрываем на эту сессию */
+  }
+}
+
+if (netCanvasHintClose) {
+  netCanvasHintClose.addEventListener('click', dismissCanvasHint);
 }
 
 tabButtons.forEach((btn) => {
@@ -280,9 +316,18 @@ function setTreeZoom(value) {
   requestAnimationFrame(() => drawConnectors());
 }
 
-netZoomInBtn.addEventListener('click', () => setTreeZoom(treeZoom + TREE_ZOOM_STEP));
-netZoomOutBtn.addEventListener('click', () => setTreeZoom(treeZoom - TREE_ZOOM_STEP));
-netZoomResetBtn.addEventListener('click', () => setTreeZoom(1));
+netZoomInBtn.addEventListener('click', () => {
+  dismissCanvasHint();
+  setTreeZoom(treeZoom + TREE_ZOOM_STEP);
+});
+netZoomOutBtn.addEventListener('click', () => {
+  dismissCanvasHint();
+  setTreeZoom(treeZoom - TREE_ZOOM_STEP);
+});
+netZoomResetBtn.addEventListener('click', () => {
+  dismissCanvasHint();
+  setTreeZoom(1);
+});
 
 // «Вписать в экран»: масштаб подбирается так, чтобы всё дерево (включая самые
 // широкие/глубокие ветви) уместилось в видимую область без горизонтальной и
@@ -292,6 +337,7 @@ netZoomResetBtn.addEventListener('click', () => setTreeZoom(1));
 // считаем нужный коэффициент. Округляем вниз до шага зума, чтобы дерево не
 // перекрывало края даже при округлении.
 netZoomFitBtn.addEventListener('click', () => {
+  dismissCanvasHint();
   const naturalWidth = networkTreeEl.offsetWidth;
   const naturalHeight = networkTreeEl.offsetHeight;
   if (!naturalWidth || !naturalHeight) return;
@@ -328,6 +374,7 @@ networkTreeWrapperEl.addEventListener(
   (event) => {
     if (!(event.ctrlKey || event.metaKey)) return;
     event.preventDefault();
+    dismissCanvasHint();
     const direction = event.deltaY < 0 ? 1 : -1;
     const newZoom = Math.min(
       TREE_ZOOM_MAX,
@@ -367,6 +414,7 @@ let panStartScrollTop = 0;
 networkTreeWrapperEl.addEventListener('mousedown', (event) => {
   if (event.button !== 0) return;
   if (event.target.closest('.net-node, button, input, select, textarea, a')) return;
+  dismissCanvasHint();
   isPanningTree = true;
   networkTreeWrapperEl.classList.add('is-panning');
   panStartX = event.clientX;

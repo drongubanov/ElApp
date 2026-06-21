@@ -1151,6 +1151,70 @@ input:focus {
   font-variant-numeric: tabular-nums;
 }
 
+/* Подсказка про pan/зум при первом заходе. position: sticky (как у
+   .net-zoom-controls) держит её у левого края видимой области, даже когда
+   дерево шире wrapper'а и прокручено вбок. Лежит в потоке под кнопками зума,
+   ничего не перекрывая; показывается один раз и убирается насовсем. */
+.net-canvas-hint {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
+  max-width: min(440px, 100%);
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* display: flex выше по специфичности, чем UA-правило [hidden] { display: none },
+   поэтому атрибут hidden сам по себе не скрыл бы подсказку — задаём явно. */
+.net-canvas-hint[hidden] {
+  display: none;
+}
+
+.net-canvas-hint-text {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.net-canvas-hint-text kbd,
+.net-canvas-hint-key {
+  display: inline-block;
+  padding: 0 5px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.net-canvas-hint-close {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.net-canvas-hint-close:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
 /* Индикатор «вы здесь» — показывает, какая часть широкого дерева видна
    сейчас, и где она расположена по горизонтали. Лежит вне скроллируемого
    .net-tree-wrapper, поэтому сам не скроллится и всегда на виду. */
