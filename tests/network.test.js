@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateNode, calculateLineVoltageDrop, calculateTree, annotateShortCircuit, annotateVoltageDrop } from '../js/network.js';
+import { calculateNode, calculateLineVoltageDrop, calculateTree, annotateShortCircuit, annotateVoltageDrop, phaseBalance } from '../js/network.js';
 import { NETWORK_TYPES } from '../js/calculations.js';
 
 test('calculateNode считает ток и подбирает защиту листового узла', () => {
@@ -576,6 +576,55 @@ test('annotateShortCircuit: петля «фаза–PE» учитывает ум
   const phaseVoltage = 380 / Math.sqrt(3);
   assert.ok(Math.abs(i1 - phaseVoltage / (zT + resistance + peResistance)) < 1e-9);
   assert.ok(i1 < phaseVoltage / (zT + 2 * resistance));
+});
+
+test('phaseBalance: равные доли → симметрия, ток фазы равен линейному, нейтраль ноль', () => {
+  const pb = phaseBalance(20, NETWORK_TYPES.AC3, [1, 1, 1]);
+  assert.ok(pb);
+  pb.currents.forEach((c) => assert.ok(Math.abs(c - 20) < 1e-9));
+  assert.ok(Math.abs(pb.neutral) < 1e-9);
+  assert.ok(Math.abs(pb.maxPhase - 20) < 1e-9);
+});
+
+test('phaseBalance: вся нагрузка на одной фазе → её ток втрое больше, нейтраль равна ему', () => {
+  const pb = phaseBalance(20, NETWORK_TYPES.AC3, [1, 0, 0]);
+  assert.ok(Math.abs(pb.currents[0] - 60) < 1e-9);
+  assert.equal(pb.currents[1], 0);
+  assert.equal(pb.currents[2], 0);
+  assert.ok(Math.abs(pb.neutral - 60) < 1e-9);
+  assert.ok(Math.abs(pb.maxPhase - 60) < 1e-9);
+});
+
+test('phaseBalance: доли нормируются (любые относительные веса)', () => {
+  const pb = phaseBalance(30, NETWORK_TYPES.AC3, [2, 2, 2]);
+  pb.currents.forEach((c) => assert.ok(Math.abs(c - 30) < 1e-9));
+  assert.ok(Math.abs(pb.shares[0] - 1 / 3) < 1e-9);
+});
+
+test('phaseBalance: не трёхфазная сеть или нулевой ток → null', () => {
+  assert.equal(phaseBalance(20, NETWORK_TYPES.AC1, [1, 1, 1]), null);
+  assert.equal(phaseBalance(0, NETWORK_TYPES.AC3, [1, 1, 1]), null);
+  assert.equal(phaseBalance(20, NETWORK_TYPES.AC3, [0, 0, 0]), null);
+});
+
+test('calculateNode: трёхфазный узел получает распределение по фазам и ток нейтрали', () => {
+  const calc = calculateNode({
+    networkType: NETWORK_TYPES.AC3,
+    voltage: 380,
+    powerFactor: 1,
+    hasOwnLoad: true,
+    known: 'current',
+    knownValue: 20,
+    installationMethod: 'air',
+    cableCount: 1,
+    cableLength: 0,
+    phaseShares: [2, 1, 0],
+  });
+  assert.ok(calc.phaseBalance);
+  // Несимметрия → ток нейтрали больше нуля.
+  assert.ok(calc.phaseBalance.neutral > 0);
+  // Самая загруженная фаза превышает симметричный ток узла.
+  assert.ok(calc.phaseBalance.maxPhase > calc.result.I);
 });
 
 test('annotateVoltageDrop: суммирует потерю напряжения по сегментам от точки ввода до узла', () => {

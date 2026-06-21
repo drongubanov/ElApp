@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculate, calculateVoltageDrop, NETWORK_TYPES } from '../js/calculations.js';
+import { calculate, calculateVoltageDrop, neutralCurrent, NETWORK_TYPES } from '../js/calculations.js';
 
 test('DC: ток по известной мощности', () => {
   const r = calculate({ networkType: NETWORK_TYPES.DC, voltage: 24, known: 'power', knownValue: 240 });
@@ -83,4 +83,22 @@ test('calculateVoltageDrop: ошибка при нулевой длине или
   const base = { networkType: NETWORK_TYPES.DC, voltage: 24, current: 10, section: 2.5 };
   assert.throws(() => calculateVoltageDrop({ ...base, length: 0, material: 'copper' }));
   assert.throws(() => calculateVoltageDrop({ ...base, length: 10, material: 'unobtainium' }));
+});
+
+test('neutralCurrent: симметричная нагрузка → ток нейтрали ноль', () => {
+  assert.equal(neutralCurrent(10, 10, 10), 0);
+});
+
+test('neutralCurrent: нагрузка только на одной фазе → ток нейтрали равен фазному', () => {
+  assert.ok(Math.abs(neutralCurrent(15, 0, 0) - 15) < 1e-9);
+});
+
+test('neutralCurrent: две равные фазы по 10 А, третья пустая → 10 А', () => {
+  // √(100 + 100 + 0 − 100 − 0 − 0) = √100 = 10.
+  assert.ok(Math.abs(neutralCurrent(10, 10, 0) - 10) < 1e-9);
+});
+
+test('neutralCurrent: частичная несимметрия даёт промежуточное значение', () => {
+  const i = neutralCurrent(12, 8, 10);
+  assert.ok(i > 0 && i < 4);
 });

@@ -192,6 +192,10 @@ const nodeCableCountInput = document.getElementById('node-cable-count');
 const nodeAmbientTempInput = document.getElementById('node-ambient-temp');
 const nodeInsulationSelect = document.getElementById('node-insulation');
 const nodeCableLengthInput = document.getElementById('node-cable-length');
+const nodePhaseField = document.getElementById('node-phase-field');
+const nodePhaseL1Input = document.getElementById('node-phase-l1');
+const nodePhaseL2Input = document.getElementById('node-phase-l2');
+const nodePhaseL3Input = document.getElementById('node-phase-l3');
 const nodeKcField = document.getElementById('node-kc-field');
 const nodeKcInput = document.getElementById('node-kc');
 const nodeErrorMessage = document.getElementById('node-error-message');
@@ -294,6 +298,7 @@ function createNode(overrides = {}) {
     cableLength: 0,
     ambientTemp: 25,
     insulation: 'pvc',
+    phaseShares: [1, 1, 1],
     simultaneityFactor: 1,
     utilizationFactor: 1,
     loadType: 'general',
@@ -1736,6 +1741,29 @@ function renderNodeResult(node) {
     });
   }
 
+  if (calc.phaseBalance) {
+    const { currents, neutral, maxPhase } = calc.phaseBalance;
+    const balanced = neutral < 0.01 * maxPhase;
+    const overloaded = protection.breaker != null && maxPhase > protection.breaker;
+    let note =
+      `Токи фаз L1/L2/L3: ${currents.map((c) => `${c.toFixed(1)} А`).join(' · ')}. ` +
+      `Ток в нейтрали Iн ≈ ${neutral.toFixed(1)} А (геометрическая сумма по основной гармонике; ` +
+      'высшие гармоники не учитываются).';
+    if (overloaded) {
+      note +=
+        ` ✗ Самая загруженная фаза (${maxPhase.toFixed(1)} А) превышает номинал автомата ` +
+        `${protection.breaker} А, подобранного по симметричному току, — выровняйте нагрузку или увеличьте номинал.`;
+    } else if (!balanced) {
+      note += ' Нейтральный проводник должен быть рассчитан на этот ток (особенно PEN в системах TN-C).';
+    }
+    addResultItem(nodeResDetails, {
+      label: 'Распределение по фазам',
+      value: balanced ? 'симметрично' : `Iн ≈ ${neutral.toFixed(1)} А`,
+      note,
+      status: overloaded ? 'warn' : balanced ? 'ok' : null,
+    });
+  }
+
   if (calc.shortCircuit) {
     const { i3, i1, curve, earthingSystem, disconnection, thermalCheck } = calc.shortCircuit;
     let note =
@@ -1819,6 +1847,12 @@ function renderPanel() {
     nodeEarthingSystemSelect.value = node.earthingSystem ?? 'TN-C-S';
   }
 
+  const shares = Array.isArray(node.phaseShares) && node.phaseShares.length === 3 ? node.phaseShares : [1, 1, 1];
+  nodePhaseField.hidden = node.networkType !== NETWORK_TYPES.AC3;
+  nodePhaseL1Input.value = shares[0];
+  nodePhaseL2Input.value = shares[1];
+  nodePhaseL3Input.value = shares[2];
+
   updateNodeLoadFieldsUI();
   updateNodeKnownFieldsUI();
   updateNodeLoadTypeUI();
@@ -1849,6 +1883,11 @@ function onPanelChange() {
   node.ambientTemp = nodeAmbientTempInput.value === '' ? 25 : Number(nodeAmbientTempInput.value);
   node.insulation = nodeInsulationSelect.value;
   node.cableLength = Number(nodeCableLengthInput.value) || 0;
+  node.phaseShares = [
+    Number(nodePhaseL1Input.value) || 0,
+    Number(nodePhaseL2Input.value) || 0,
+    Number(nodePhaseL3Input.value) || 0,
+  ];
   node.simultaneityFactor = Number(nodeKcInput.value) || 1;
   node.utilizationFactor = Number(nodeUtilizationInput.value) || 1;
   node.loadType = nodeLoadTypeSelect.value;
@@ -1861,6 +1900,7 @@ function onPanelChange() {
 
   netPanelTitle.textContent = node.name;
   renderBreadcrumb(node);
+  nodePhaseField.hidden = node.networkType !== NETWORK_TYPES.AC3;
   updateNodeLoadFieldsUI();
   updateNodeKnownFieldsUI();
   updateNodeLoadTypeUI();
@@ -1877,6 +1917,7 @@ nodeNetworkTypeSelect.addEventListener('change', () => {
   nodeNameInput, nodeHasOwnLoadInput, nodeVoltageInput, nodePfInput,
   nodePowerValueInput, nodePowerUnitSelect, nodeCurrentValueInput, nodeInstallationSelect,
   nodeCableCountInput, nodeAmbientTempInput, nodeInsulationSelect, nodeCableLengthInput, nodeKcInput,
+  nodePhaseL1Input, nodePhaseL2Input, nodePhaseL3Input,
   nodeUtilizationInput, nodeLoadTypeSelect, nodeStartRatioInput,
   nodeTransformerPowerInput, nodeTransformerUkInput, nodeEarthingSystemSelect,
   ...document.querySelectorAll('input[name="node-known"]'),

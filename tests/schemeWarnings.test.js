@@ -141,3 +141,18 @@ test('collectSchemeWarnings: недостаточная термостойкос
   assert.ok(thermal, 'ожидается замечание о термостойкости кабеля при КЗ');
   assert.equal(thermal.severity, 'warn');
 });
+
+test('collectSchemeWarnings: перекос фаз (перегруз самой нагруженной фазы) попадает в сводку', () => {
+  // Трёхфазный узел с собственной нагрузкой, вся нагрузка смещена на одну фазу:
+  // ток этой фазы втрое больше симметричного и превышает подобранный автомат.
+  const tree = baseNode({
+    hasOwnLoad: true,
+    known: 'current',
+    knownValue: 20,
+    phaseShares: [1, 0, 0],
+  });
+  const warnings = collectSchemeWarnings(calculateTree(tree));
+  const phase = warnings.find((w) => w.category === 'phase-balance');
+  assert.ok(phase, 'ожидается замечание о перекосе фаз');
+  assert.equal(phase.severity, 'warn');
+});
