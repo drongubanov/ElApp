@@ -196,14 +196,7 @@ const nodeResP = document.getElementById('node-res-p');
 const nodeResS = document.getElementById('node-res-s');
 const nodeResQ = document.getElementById('node-res-q');
 const nodeResI = document.getElementById('node-res-i');
-const nodeResLoadDiagram = document.getElementById('node-res-load-diagram');
-const nodeResBreaker = document.getElementById('node-res-breaker');
-const nodeResCable = document.getElementById('node-res-cable');
-const nodeResPeSection = document.getElementById('node-res-pe-section');
-const nodeResVoltageDrop = document.getElementById('node-res-voltage-drop');
-const nodeResSelectivity = document.getElementById('node-res-selectivity');
-const nodeResBalance = document.getElementById('node-res-balance');
-const nodeResShortCircuit = document.getElementById('node-res-shortcircuit');
+const nodeResDetails = document.getElementById('node-res-details');
 
 function switchTab(tabName) {
   tabButtons.forEach((btn) => {
@@ -1524,6 +1517,52 @@ function updateNodeLoadTypeUI() {
   nodeStartRatioField.hidden = nodeLoadTypeSelect.value !== 'motor';
 }
 
+/**
+ * Добавляет в панель результатов одну структурированную строку: заголовок
+ * проверки, краткое значение и развёрнутое пояснение. status ('ok'|'warn'|null)
+ * красит левую границу и значок — так длинный «простыни» текст превращается в
+ * набор читаемых блоков с понятным статусом каждой проверки.
+ */
+function addResultItem(container, { label, value, note, status }) {
+  const item = document.createElement('div');
+  item.className = 'result-item';
+  if (status) item.classList.add(status);
+
+  const head = document.createElement('div');
+  head.className = 'result-item-head';
+
+  if (status) {
+    const badge = document.createElement('span');
+    badge.className = 'result-item-status';
+    badge.textContent = status === 'ok' ? '✓' : '⚠';
+    badge.setAttribute('aria-hidden', 'true');
+    head.appendChild(badge);
+  }
+
+  const labelEl = document.createElement('span');
+  labelEl.className = 'result-item-label';
+  labelEl.textContent = label;
+  head.appendChild(labelEl);
+
+  if (value) {
+    const valueEl = document.createElement('span');
+    valueEl.className = 'result-item-value';
+    valueEl.textContent = value;
+    head.appendChild(valueEl);
+  }
+
+  item.appendChild(head);
+
+  if (note) {
+    const noteEl = document.createElement('p');
+    noteEl.className = 'result-item-note';
+    noteEl.textContent = note;
+    item.appendChild(noteEl);
+  }
+
+  container.appendChild(item);
+}
+
 function renderNodeResult(node) {
   const calc = lastCalcMap?.get(node.id);
   nodeErrorMessage.textContent = '';
@@ -1544,110 +1583,154 @@ function renderNodeResult(node) {
   nodeResQ.textContent = formatReactivePower(result.Q);
   nodeResI.textContent = formatCurrent(result.I);
 
-  nodeResLoadDiagram.textContent =
-    installed && node.utilizationFactor < 1
-      ? `Установленная (паспортная) мощность собственной нагрузки узла: ${formatPower(installed.P)}; расчётная ` +
-        `(с учётом Ku = ${node.utilizationFactor}): ${formatPower(calc.ownP)} — используется для подбора защиты и кабеля.`
-      : '';
+  nodeResDetails.replaceChildren();
 
-  let breakerText = protection.breaker
-    ? `Рекомендуемый автоматический выключатель: ${protection.breaker} А (расчётный ток ${result.I.toFixed(2)} А)`
-    : `Расчётный ток (${result.I.toFixed(2)} А) превышает диапазон таблицы — требуется индивидуальный подбор оборудования.`;
-  if (startCurrent) {
-    breakerText += protection.curveOverRange
-      ? ` Пусковой ток ${startCurrent.toFixed(2)} А выходит за пределы стандартных характеристик B/C/D для этого ` +
-        'номинала — нужен автомат со специальной уставкой расцепителя или устройство плавного пуска.'
-      : ` Пусковой ток ${startCurrent.toFixed(2)} А (Кп = ${node.startCurrentRatio}) — характеристика не ниже ` +
-        `${protection.recommendedCurve} (электромагнитный расцепитель не сработает ложно при пуске).`;
+  if (installed && node.utilizationFactor < 1) {
+    addResultItem(nodeResDetails, {
+      label: 'Расчётная нагрузка',
+      value: formatPower(calc.ownP),
+      note:
+        `Установленная (паспортная) мощность собственной нагрузки узла — ${formatPower(installed.P)}; ` +
+        `расчётная (с учётом Ku = ${node.utilizationFactor}) используется для подбора защиты и кабеля.`,
+    });
   }
-  nodeResBreaker.textContent = breakerText;
 
-  const cableParts = [];
+  if (protection.breaker) {
+    let note = '';
+    let status = null;
+    if (startCurrent) {
+      if (protection.curveOverRange) {
+        note =
+          `Пусковой ток ${startCurrent.toFixed(2)} А выходит за пределы стандартных характеристик B/C/D для ` +
+          'этого номинала — нужен автомат со специальной уставкой расцепителя или устройство плавного пуска.';
+        status = 'warn';
+      } else {
+        note =
+          `Пусковой ток ${startCurrent.toFixed(2)} А (Кп = ${node.startCurrentRatio}) — характеристика не ниже ` +
+          `${protection.recommendedCurve} (электромагнитный расцепитель не сработает ложно при пуске).`;
+      }
+    }
+    addResultItem(nodeResDetails, { label: 'Автоматический выключатель', value: `${protection.breaker} А`, note, status });
+  } else {
+    addResultItem(nodeResDetails, {
+      label: 'Автоматический выключатель',
+      value: '—',
+      note: `Расчётный ток (${result.I.toFixed(2)} А) превышает диапазон таблицы — требуется индивидуальный подбор оборудования.`,
+      status: 'warn',
+    });
+  }
+
+  const cableSections = [];
+  const cableAmpacities = [];
   if (protection.copperCable) {
-    cableParts.push(`медь — ${protection.copperCable.section} мм² (доп. ток ${protection.copperCable.ratedCurrent} А)`);
+    cableSections.push(`медь ${protection.copperCable.section} мм²`);
+    cableAmpacities.push(`медь — ${protection.copperCable.ratedCurrent} А`);
   }
   if (protection.aluminumCable) {
-    cableParts.push(`алюминий — ${protection.aluminumCable.section} мм² (доп. ток ${protection.aluminumCable.ratedCurrent} А)`);
+    cableSections.push(`алюминий ${protection.aluminumCable.section} мм²`);
+    cableAmpacities.push(`алюминий — ${protection.aluminumCable.ratedCurrent} А`);
   }
-  nodeResCable.textContent = cableParts.length
-    ? `Рекомендуемое сечение кабеля: ${cableParts.join('; ')}`
-    : 'Расчётный ток превышает диапазон табличных сечений — требуется индивидуальный подбор кабеля.';
+  if (cableSections.length) {
+    addResultItem(nodeResDetails, {
+      label: 'Сечение кабеля',
+      value: cableSections.join(' · '),
+      note: `Допустимый длительный ток: ${cableAmpacities.join(', ')}.`,
+    });
+  } else {
+    addResultItem(nodeResDetails, {
+      label: 'Сечение кабеля',
+      value: '—',
+      note: 'Расчётный ток превышает диапазон табличных сечений — требуется индивидуальный подбор кабеля.',
+      status: 'warn',
+    });
+  }
 
-  nodeResPeSection.textContent = buildPeSectionText(protection);
+  const peText = buildPeSectionText(protection);
+  if (peText) {
+    addResultItem(nodeResDetails, { label: 'Защитный проводник (PE/PEN)', note: peText });
+  }
 
-  nodeResVoltageDrop.textContent = '';
-  nodeResVoltageDrop.classList.remove('warn');
   if (voltageDrop) {
     const materialLabel = voltageDrop.material === 'copper' ? 'медь' : 'алюминий';
-    let text =
-      `Потеря напряжения на линии ${node.cableLength} м (сечение ${voltageDrop.section} мм², ${materialLabel}): ` +
+    let note =
+      `На линии ${node.cableLength} м (сечение ${voltageDrop.section} мм², ${materialLabel}): ` +
       `${voltageDrop.drop.toFixed(2)} В (${voltageDrop.dropPercent.toFixed(2)}%).`;
+    let value = `${voltageDrop.dropPercent.toFixed(2)}%`;
+    let status = null;
     if (calc.cumulativeVoltageDropPercent != null) {
       const withinLimit = calc.cumulativeVoltageDropPercent <= VOLTAGE_DROP_LIMIT_PERCENT;
-      text +=
+      value = `${calc.cumulativeVoltageDropPercent.toFixed(2)}% от ввода`;
+      note +=
         ` Суммарно от точки ввода: ${calc.cumulativeVoltageDropPercent.toFixed(2)}% — ` +
         `${withinLimit ? 'в пределах общепринятой нормы (≤5%)' : 'превышает общепринятую норму (≤5%), увеличьте сечение на этом или предыдущих участках'}.`;
-      nodeResVoltageDrop.classList.toggle('warn', !withinLimit);
+      status = withinLimit ? 'ok' : 'warn';
     }
-    nodeResVoltageDrop.textContent = text;
+    addResultItem(nodeResDetails, { label: 'Падение напряжения', value, note, status });
   }
 
-  nodeResSelectivity.classList.remove('warn');
-  if (!node.children.length) {
-    nodeResSelectivity.textContent = '';
-  } else if (selectivity) {
-    const verdict = {
-      selective: '✓ Селективность обеспечена (приближённо)',
-      uncertain: '⚠ Селективность не гарантирована',
-      'not-selective': '✗ Селективность не обеспечена',
-    }[selectivity.level];
-    nodeResSelectivity.textContent =
-      `${verdict}: автомат узла ${protection.breaker} А, наибольший номинал среди дочерних линий — ` +
-      `${selectivity.maxDownstream} А (отношение ×${selectivity.ratio.toFixed(2)}; по приближённому правилу ` +
-      `селективность гарантируется при отношении ≥ ${SELECTIVITY_SAFE_RATIO}). Сумма номиналов дочерних линий — ` +
-      `${sumOfChildBreakers} А (узел рассчитан по нагрузке с учётом Кс = ${node.simultaneityFactor}, а не по этой ` +
-      'сумме). Полную проверку селективности выполняйте по времятоковым характеристикам аппаратов производителя.';
-    nodeResSelectivity.classList.toggle('warn', selectivity.level !== 'selective');
-  } else {
-    nodeResSelectivity.textContent =
-      `Наибольший номинал среди дочерних линий — ${maxOfChildBreakers} А; сумма номиналов дочерних линий — ` +
-      `${sumOfChildBreakers} А. Автомат этого узла не подобран (расчётный ток вне диапазона таблицы) — проверка ` +
-      'селективности невозможна.';
+  if (node.children.length) {
+    if (selectivity) {
+      const verdict = {
+        selective: 'обеспечена (приближённо)',
+        uncertain: 'не гарантирована',
+        'not-selective': 'не обеспечена',
+      }[selectivity.level];
+      addResultItem(nodeResDetails, {
+        label: 'Селективность',
+        value: verdict,
+        status: selectivity.level === 'selective' ? 'ok' : 'warn',
+        note:
+          `Автомат узла ${protection.breaker} А, наибольший номинал среди дочерних линий — ` +
+          `${selectivity.maxDownstream} А (отношение ×${selectivity.ratio.toFixed(2)}; по приближённому правилу ` +
+          `селективность гарантируется при отношении ≥ ${SELECTIVITY_SAFE_RATIO}). Сумма номиналов дочерних линий — ` +
+          `${sumOfChildBreakers} А (узел рассчитан по нагрузке с учётом Кс = ${node.simultaneityFactor}, а не по этой ` +
+          'сумме). Полную проверку селективности выполняйте по времятоковым характеристикам аппаратов производителя.',
+      });
+    } else {
+      addResultItem(nodeResDetails, {
+        label: 'Селективность',
+        value: '—',
+        note:
+          `Наибольший номинал среди дочерних линий — ${maxOfChildBreakers} А; сумма номиналов дочерних линий — ` +
+          `${sumOfChildBreakers} А. Автомат этого узла не подобран (расчётный ток вне диапазона таблицы) — проверка ` +
+          'селективности невозможна.',
+      });
+    }
   }
 
-  nodeResBalance.textContent = '';
-  nodeResBalance.classList.remove('warn');
   if (calc.balance) {
     const { rawCurrent, breaker, cableAmpacity, overBreaker, overCable } = calc.balance;
     const exceeded = [];
     if (overBreaker) exceeded.push(`автомат узла (${breaker} А)`);
     if (overCable) exceeded.push(`допустимый ток кабеля (${cableAmpacity} А)`);
-    nodeResBalance.textContent =
-      `⚠ Без учёта коэффициента одновременности (Кс = ${node.simultaneityFactor}) суммарный ток дочерних узлов ` +
-      `составил бы ${rawCurrent.toFixed(2)} А — это больше, чем ${exceeded.join(' и ')}. Защита узла держится ` +
-      'только на справедливости принятого Кс, без запаса: проверьте, действительно ли дочерние линии не работают ' +
-      'одновременно на полную нагрузку.';
-    nodeResBalance.classList.add('warn');
+    addResultItem(nodeResDetails, {
+      label: 'Баланс нагрузки',
+      value: `${rawCurrent.toFixed(2)} А без Кс`,
+      status: 'warn',
+      note:
+        `Без учёта коэффициента одновременности (Кс = ${node.simultaneityFactor}) суммарный ток дочерних узлов ` +
+        `составил бы ${rawCurrent.toFixed(2)} А — это больше, чем ${exceeded.join(' и ')}. Защита узла держится ` +
+        'только на справедливости принятого Кс, без запаса: проверьте, действительно ли дочерние линии не работают ' +
+        'одновременно на полную нагрузку.',
+    });
   }
 
-  nodeResShortCircuit.textContent = '';
-  nodeResShortCircuit.classList.remove('warn');
   if (calc.shortCircuit) {
     const { i3, i1, curve, disconnection, thermalCheck } = calc.shortCircuit;
-    let text =
-      `Приближённая оценка тока КЗ в этой точке: Iкз(3) ≈ ${formatShortCircuitCurrent(i3)}, Iкз(1) ≈ ` +
-      `${formatShortCircuitCurrent(i1)} (сопротивление кабелей выше по дереву накоплено от трансформатора; ` +
-      'индуктивные составляющие и сопротивление выше трансформатора не учитываются).';
+    let note =
+      `Приближённая оценка: Iкз(3) ≈ ${formatShortCircuitCurrent(i3)}, Iкз(1) ≈ ${formatShortCircuitCurrent(i1)} ` +
+      '(сопротивление кабелей выше по дереву накоплено от трансформатора; индуктивные составляющие и ' +
+      'сопротивление выше трансформатора не учитываются).';
     let warn = false;
     if (disconnection) {
-      text += disconnection.ok
+      note += disconnection.ok
         ? ` ✓ При характеристике ${curve} отключение заведомо быстрее нормативных 0,4 с / 0,2 с.`
         : ` ✗ При характеристике ${curve} быстрое отключение не гарантировано — см. мини-калькулятор КЗ на ` +
           'вкладке «Справка».';
       warn = warn || !disconnection.ok;
     }
     if (thermalCheck) {
-      text += thermalCheck.ok
+      note += thermalCheck.ok
         ? ` ✓ Термическая стойкость кабеля при КЗ обеспечена (мин. сечение по нагреву ` +
           `${thermalCheck.minSection.toFixed(2)} мм² ≤ фактического ${thermalCheck.actualSection} мм², ` +
           `время отключения принято ${thermalCheck.time} с).`
@@ -1656,8 +1739,13 @@ function renderNodeResult(node) {
           `отключения принято ${thermalCheck.time} с) — увеличьте сечение или ускорьте отключение.`;
       warn = warn || !thermalCheck.ok;
     }
-    nodeResShortCircuit.classList.toggle('warn', warn);
-    nodeResShortCircuit.textContent = text;
+    const status = disconnection || thermalCheck ? (warn ? 'warn' : 'ok') : null;
+    addResultItem(nodeResDetails, {
+      label: 'Ток короткого замыкания',
+      value: `Iкз(3) ≈ ${formatShortCircuitCurrent(i3)}`,
+      note,
+      status,
+    });
   }
 }
 

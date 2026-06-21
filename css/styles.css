@@ -293,6 +293,68 @@ input:focus {
   margin-bottom: 0;
 }
 
+/* --- Структурированная панель результатов узла сети ----------------------- */
+.result-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.result-item {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+
+.result-item.ok {
+  border-left-color: var(--color-success);
+}
+
+.result-item.warn {
+  border-left-color: var(--color-danger);
+}
+
+.result-item-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.result-item-status {
+  font-weight: 700;
+  line-height: 1;
+}
+
+.result-item.ok .result-item-status {
+  color: var(--color-success);
+}
+
+.result-item.warn .result-item-status {
+  color: var(--color-danger);
+}
+
+.result-item-label {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.result-item-value {
+  margin-left: auto;
+  font-weight: 600;
+  color: var(--color-accent);
+  text-align: right;
+}
+
+.result-item-note {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
 .note-line {
   font-size: 0.85rem;
   color: var(--color-text-muted);
