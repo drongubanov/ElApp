@@ -9,6 +9,7 @@ import {
 } from './tables.js';
 import { calculateShortCircuit, checkDisconnectionByCurve } from './shortCircuit.js';
 import { calculateTree, annotateShortCircuit, annotateVoltageDrop, DEFAULT_START_CURRENT_RATIO, EARTHING_SYSTEMS } from './network.js';
+import { DEFAULT_TARGET_POWER_FACTOR } from './reactiveCompensation.js';
 import { loadNetworkScheme, saveNetworkScheme } from './networkStorage.js';
 import { loadProjects, getProject, saveProject, deleteProject } from './networkProjects.js';
 import { loadSnapshots, getSnapshot, saveSnapshot, deleteSnapshot } from './schemeSnapshots.js';
@@ -202,6 +203,8 @@ const nodePhaseField = document.getElementById('node-phase-field');
 const nodePhaseL1Input = document.getElementById('node-phase-l1');
 const nodePhaseL2Input = document.getElementById('node-phase-l2');
 const nodePhaseL3Input = document.getElementById('node-phase-l3');
+const nodeTargetPfField = document.getElementById('node-target-pf-field');
+const nodeTargetPfInput = document.getElementById('node-target-pf');
 const nodeKcField = document.getElementById('node-kc-field');
 const nodeKcInput = document.getElementById('node-kc');
 const nodeErrorMessage = document.getElementById('node-error-message');
@@ -311,6 +314,7 @@ function createNode(overrides = {}) {
     utilizationFactor: 1,
     loadType: 'general',
     startCurrentRatio: DEFAULT_START_CURRENT_RATIO,
+    targetPowerFactor: DEFAULT_TARGET_POWER_FACTOR,
     transformerPowerKva: null,
     transformerUkPercent: null,
     earthingSystem: 'TN-C-S',
@@ -1536,6 +1540,7 @@ function updateNodeKnownFieldsUI() {
   nodeUtilizationField.hidden = isGroup || known !== 'power';
   nodeRealLoadFieldset.hidden = isGroup;
   nodeGroupFields.hidden = !isGroup;
+  nodeTargetPfField.hidden = nodeNetworkTypeSelect.value === NETWORK_TYPES.DC;
 }
 
 /**
@@ -1670,7 +1675,7 @@ function renderNodeResult(node) {
   }
 
   nodeResultEl.hidden = false;
-  const { result, protection, voltageDrop, sumOfChildBreakers, maxOfChildBreakers, selectivity, installed, startCurrent, groupDemand } = calc;
+  const { result, protection, voltageDrop, sumOfChildBreakers, maxOfChildBreakers, selectivity, installed, startCurrent, groupDemand, compensation } = calc;
   nodeResP.textContent = formatPower(result.P);
   nodeResS.textContent = formatApparentPower(result.S);
   nodeResQ.textContent = formatReactivePower(result.Q);
@@ -1695,6 +1700,21 @@ function renderNodeResult(node) {
       note:
         `Установленная (паспортная) мощность собственной нагрузки узла — ${formatPower(installed.P)}; ` +
         `расчётная (с учётом Ku = ${node.utilizationFactor}) используется для подбора защиты и кабеля.`,
+    });
+  }
+
+  if (compensation) {
+    const { targetPowerFactor, currentPowerFactor, requiredQc, compensatedQ, compensatedS } = compensation;
+    addResultItem(nodeResDetails, {
+      label: 'Компенсация реактивной мощности',
+      value: `Qc ≈ ${formatReactivePower(requiredQc)}`,
+      status: 'warn',
+      note:
+        `Фактический cosφ узла ≈ ${currentPowerFactor.toFixed(2)} ниже целевого ${targetPowerFactor.toFixed(2)}. ` +
+        `Конденсаторная батарея мощностью Qc ≈ ${formatReactivePower(requiredQc)} снизит реактивную мощность узла ` +
+        `до Q ≈ ${formatReactivePower(compensatedQ)} и полную мощность — до S ≈ ${formatApparentPower(compensatedS)} ` +
+        `(cosφ ≈ ${targetPowerFactor.toFixed(2)}), что уменьшит ток линии и потери в кабеле и трансформаторе. Автомат и ` +
+        'кабель ниже подобраны по фактическому (не скомпенсированному) току.',
     });
   }
 
@@ -1924,6 +1944,7 @@ function renderPanel() {
   nodeInsulationSelect.value = node.insulation ?? 'pvc';
   nodeCableLengthInput.value = node.cableLength || '';
   nodeKcInput.value = node.simultaneityFactor;
+  nodeTargetPfInput.value = node.targetPowerFactor ?? DEFAULT_TARGET_POWER_FACTOR;
   nodeUtilizationInput.value = node.utilizationFactor ?? 1;
   nodeLoadTypeSelect.value = node.loadType ?? 'general';
   nodeStartRatioInput.value = node.startCurrentRatio ?? DEFAULT_START_CURRENT_RATIO;
@@ -1982,6 +2003,7 @@ function onPanelChange() {
     Number(nodePhaseL3Input.value) || 0,
   ];
   node.simultaneityFactor = Number(nodeKcInput.value) || 1;
+  node.targetPowerFactor = Number(nodeTargetPfInput.value) || DEFAULT_TARGET_POWER_FACTOR;
   node.utilizationFactor = Number(nodeUtilizationInput.value) || 1;
   node.loadType = nodeLoadTypeSelect.value;
   node.startCurrentRatio = Number(nodeStartRatioInput.value) || DEFAULT_START_CURRENT_RATIO;
@@ -2010,7 +2032,7 @@ nodeNetworkTypeSelect.addEventListener('change', () => {
   nodeNameInput, nodeHasOwnLoadInput, nodeVoltageInput, nodePfInput, nodeLoadModeGroupInput,
   nodePowerValueInput, nodePowerUnitSelect, nodeCurrentValueInput, nodeInstallationSelect,
   nodeCableCountInput, nodeAmbientTempInput, nodeInsulationSelect, nodeCableLengthInput, nodeKcInput,
-  nodePhaseL1Input, nodePhaseL2Input, nodePhaseL3Input,
+  nodeTargetPfInput, nodePhaseL1Input, nodePhaseL2Input, nodePhaseL3Input,
   nodeUtilizationInput, nodeLoadTypeSelect, nodeStartRatioInput,
   nodeTransformerPowerInput, nodeTransformerUkInput, nodeEarthingSystemSelect,
   ...document.querySelectorAll('input[name="node-known"]'),

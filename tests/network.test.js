@@ -329,6 +329,81 @@ test('calculateTree: узел в режиме "group" передаёт groupDema
   assert.equal(calc.groupDemand.count, 1);
 });
 
+test('calculateNode считает рекомендацию по компенсации реактивной мощности при низком cosφ узла', () => {
+  const node = calculateNode({
+    networkType: NETWORK_TYPES.AC1,
+    voltage: 220,
+    powerFactor: 0.6,
+    hasOwnLoad: true,
+    known: 'power',
+    knownValue: 300,
+    installationMethod: 'air',
+    cableCount: 1,
+    cableLength: 0,
+    targetPowerFactor: 0.8,
+  });
+  assert.ok(Math.abs(node.result.P - 300) < 1e-9);
+  assert.ok(Math.abs(node.result.Q - 400) < 1e-6);
+  assert.ok(node.compensation);
+  assert.ok(Math.abs(node.compensation.currentPowerFactor - 0.6) < 1e-9);
+  // tgφ1 = 4/3, tgφ2 = 0.75 → Qc = 300·(4/3 − 0.75) = 175.
+  assert.ok(Math.abs(node.compensation.requiredQc - 175) < 1e-6);
+  assert.ok(Math.abs(node.compensation.compensatedQ - 225) < 1e-6);
+});
+
+test('calculateNode не предлагает компенсацию, если cosφ узла уже не ниже целевого', () => {
+  const node = calculateNode({
+    networkType: NETWORK_TYPES.AC1,
+    voltage: 220,
+    powerFactor: 1,
+    hasOwnLoad: true,
+    known: 'power',
+    knownValue: 1000,
+    installationMethod: 'air',
+    cableCount: 1,
+    cableLength: 0,
+  });
+  assert.equal(node.compensation, null);
+});
+
+test('calculateNode не считает компенсацию для сети постоянного тока (Q всегда 0)', () => {
+  const node = calculateNode({
+    networkType: NETWORK_TYPES.DC,
+    voltage: 24,
+    hasOwnLoad: true,
+    known: 'power',
+    knownValue: 240,
+    installationMethod: 'air',
+    cableCount: 1,
+    cableLength: 0,
+    targetPowerFactor: 0.5,
+  });
+  assert.equal(node.compensation, null);
+});
+
+test('calculateTree передаёт рекомендацию по компенсации в результат дерева', () => {
+  const tree = {
+    id: 'root',
+    name: 'Силовой щит',
+    networkType: NETWORK_TYPES.AC1,
+    voltage: 220,
+    powerFactor: 0.6,
+    hasOwnLoad: true,
+    known: 'power',
+    knownValue: 300,
+    installationMethod: 'air',
+    cableCount: 1,
+    cableLength: 0,
+    simultaneityFactor: 1,
+    targetPowerFactor: 0.8,
+    children: [],
+  };
+  const calc = calculateTree(tree);
+  assert.equal(calc.error, null);
+  assert.ok(calc.compensation);
+  assert.ok(Math.abs(calc.compensation.requiredQc - 175) < 1e-6);
+});
+
 test('calculateTree считает наибольший номинал среди дочерних автоматов и проверяет селективность', () => {
   const tree = {
     id: 'root',

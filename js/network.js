@@ -8,6 +8,7 @@ import { calculate, calculateVoltageDrop, neutralCurrent, NETWORK_TYPES } from '
 import { recommendProtection, checkSelectivity, recommendPeSection } from './tables.js';
 import { transformerImpedance, cableResistance, checkDisconnectionByCurve, minThermalSection } from './shortCircuit.js';
 import { groupDemand } from './demandFactor.js';
+import { recommendCompensation, DEFAULT_TARGET_POWER_FACTOR } from './reactiveCompensation.js';
 
 // Система заземления сети до 1 кВ (ГОСТ Р 50571.2 / ПУЭ-7 гл. 1.7). Влияет на то,
 // чем обеспечивается автоматическое отключение при замыкании на открытые
@@ -104,6 +105,12 @@ export function calculateLineVoltageDrop(result, protection, cableLength) {
  * Pр = Кс.гр·ΣPн. Коэффициент использования utilizationFactor и пусковой
  * ток в этом режиме не применяются: каждый приёмник группы уже учтён
  * своим Ки внутри groupDemand.
+ *
+ * Дополнительно для узлов сети переменного тока (не DC) считается
+ * рекомендация по компенсации реактивной мощности (см. reactiveCompensation.js):
+ * если итоговый cosφ узла (с учётом собственной нагрузки и дочерних узлов)
+ * ниже целевого targetPowerFactor, в результате появляется требуемая
+ * мощность конденсаторной батареи Qc.
  */
 export function calculateNode({
   networkType,
@@ -124,6 +131,7 @@ export function calculateNode({
   utilizationFactor = 1,
   loadType = 'general',
   startCurrentRatio = DEFAULT_START_CURRENT_RATIO,
+  targetPowerFactor = DEFAULT_TARGET_POWER_FACTOR,
   childrenTotals = { P: 0, Q: 0 },
 }) {
   if (!(simultaneityFactor > 0) || simultaneityFactor > 1) {
@@ -184,6 +192,8 @@ export function calculateNode({
   const protection = recommendProtection(I, { installationMethod, cableCount, startCurrent, ambientTemp, insulation });
   const voltageDrop = calculateLineVoltageDrop(result, protection, cableLength);
   const phaseDistribution = phaseBalance(I, networkType, phaseShares);
+  const compensation =
+    networkType !== NETWORK_TYPES.DC ? recommendCompensation({ P, Q, targetPowerFactor }) : null;
 
   return {
     result,
@@ -197,6 +207,7 @@ export function calculateNode({
     utilizationFactor,
     loadType,
     groupDemand: groupResult,
+    compensation,
   };
 }
 
@@ -267,6 +278,7 @@ export function calculateTree(node) {
     installed: calc?.installed ?? null,
     startCurrent: calc?.startCurrent ?? null,
     groupDemand: calc?.groupDemand ?? null,
+    compensation: calc?.compensation ?? null,
     sumOfChildBreakers,
     maxOfChildBreakers,
     selectivity,
