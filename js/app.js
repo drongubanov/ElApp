@@ -1328,7 +1328,7 @@ function startRenameNode(node, nameEl) {
   input.addEventListener('dblclick', (event) => event.stopPropagation());
 }
 
-function renderNodeEl(node) {
+function renderNodeEl(node, level = 1) {
   const li = document.createElement('li');
 
   const wrap = document.createElement('div');
@@ -1346,8 +1346,12 @@ function renderNodeEl(node) {
 
   const card = document.createElement('div');
   card.className = 'net-node';
-  card.setAttribute('role', 'button');
+  card.setAttribute('role', 'treeitem');
   card.setAttribute('tabindex', '0');
+  card.setAttribute('aria-level', String(level));
+  if (node.children.length) card.setAttribute('aria-expanded', node.collapsed ? 'false' : 'true');
+  const isSelected = node.id === selectedNodeId || (selectedNodeIds.size > 1 && selectedNodeIds.has(node.id));
+  card.setAttribute('aria-selected', isSelected ? 'true' : 'false');
   if (node.id === selectedNodeId) card.classList.add('selected');
   if (selectedNodeIds.size > 1 && selectedNodeIds.has(node.id)) card.classList.add('multi-selected');
 
@@ -1533,7 +1537,8 @@ function renderNodeEl(node) {
 
   if (node.children.length && !node.collapsed) {
     const ul = document.createElement('ul');
-    node.children.forEach((child) => ul.appendChild(renderNodeEl(child)));
+    ul.setAttribute('role', 'group');
+    node.children.forEach((child) => ul.appendChild(renderNodeEl(child, level + 1)));
     li.appendChild(ul);
   }
 
