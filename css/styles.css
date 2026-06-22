@@ -784,6 +784,22 @@ input:focus {
   text-overflow: ellipsis;
 }
 
+/* Единые иконки кнопок тулбара: монохромные inline-SVG на currentColor одного
+   размера и веса обводки. inline-block (а не flex) сохраняет обрезку длинных
+   подписей по text-overflow на узких экранах. */
+.btn-icon {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+  margin-right: 4px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 /* --- Выпадающее меню экспорта --------------------------------------------- */
 .net-export-menu {
   position: relative;
