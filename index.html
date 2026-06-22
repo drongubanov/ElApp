@@ -271,20 +271,26 @@
       </details>
 
       <div class="net-actions">
-        <button type="button" id="calc-network-btn" class="btn-primary">Рассчитать сеть</button>
+        <button type="button" id="calc-network-btn" class="btn-primary">
+          <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8.5 1.5 3.5 9H7l-.5 5.5L12.5 7H9l-.5-5.5Z" fill="currentColor" stroke="none"/></svg>
+          Рассчитать сеть
+        </button>
         <div class="net-actions-group" role="group" aria-label="Вид и экспорт">
         <button type="button" id="undo-network-btn" class="btn-secondary" title="Отменить последнее действие" disabled>
-          ↶ Отменить
+          <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M6 5 3 8l3 3"/><path d="M3 8h6.5a3.5 3.5 0 1 1 0 7H7"/></svg>
+          Отменить
         </button>
         <button type="button" id="heatmap-toggle-btn" class="btn-secondary" aria-pressed="false"
           title="Показывать цвет нагрузки на всех узлах и линиях без наведения">
-          🌡 Теплокарта
+          <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="2.5" y="2.5" width="11" height="11" rx="1"/><line x1="2.5" y1="8" x2="13.5" y2="8"/><line x1="8" y1="2.5" x2="8" y2="13.5"/></svg>
+          Теплокарта
         </button>
         <div class="net-export-menu">
           <button type="button" id="export-menu-btn" class="btn-secondary btn-export"
             aria-haspopup="true" aria-expanded="false" aria-controls="export-dropdown"
             title="Сохранить схему или ведомость в файл">
-            ↧ Экспорт ▾
+            <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 2.5v7"/><path d="m5 7 3 3 3-3"/><path d="M3.5 13h9"/></svg>
+            Экспорт ▾
           </button>
           <div class="net-export-dropdown" id="export-dropdown" role="menu" hidden>
             <button type="button" id="export-pdf-btn" role="menuitem" title="Сохранить однолинейную схему в PDF">
@@ -306,7 +312,8 @@
         </div>
         </div>
         <button type="button" id="reset-network-btn" class="btn-secondary btn-danger" title="Удалить все узлы и параметры и начать сначала">
-          ⟲ Сбросить сеть
+          <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M12.6 5.4A5 5 0 1 0 13.2 9"/><path d="M12.9 2.4v3.2H9.7"/></svg>
+          Сбросить сеть
         </button>
       </div>
       <p class="error-message" id="network-error-message" role="alert"></p>
