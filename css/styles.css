@@ -4,7 +4,10 @@
   --color-surface-alt: #273449;
   --color-border: #334155;
   --color-text: #e2e8f0;
-  --color-text-muted: #94a3b8;
+  /* Вспомогательный текст: контраст повышен до уверенного WCAG AA на всех фонах
+     (≥6:1 на surface-alt, ≥7:1 на surface, ≥8,5:1 на фоне страницы), при этом
+     цвет остаётся заметно приглушённым относительно основного текста #e2e8f0. */
+  --color-text-muted: #a8b5c6;
   --color-accent: #f59e0b;
   --color-accent-dark: #b45309;
   --color-danger: #f87171;
