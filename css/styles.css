@@ -13,6 +13,13 @@
   --color-danger: #f87171;
   --color-success: #4ade80;
   --radius: 6px;
+  /* Единая шкала отступов для padding/margin/gap — новые правила должны
+     ссылаться на эти переменные вместо точечных значений в пикселях. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
 }
 
 * {
@@ -28,7 +35,7 @@ body {
 }
 
 .app-header {
-  padding: 24px 16px 8px;
+  padding: var(--space-5) var(--space-4) var(--space-2);
   text-align: center;
 }
 
@@ -38,7 +45,7 @@ body {
 }
 
 .subtitle {
-  margin: 4px 0 0;
+  margin: var(--space-1) 0 0;
   color: var(--color-text-muted);
   font-size: 0.95rem;
 }
@@ -46,8 +53,8 @@ body {
 .tabs {
   display: flex;
   justify-content: center;
-  gap: 8px;
-  padding: 16px;
+  gap: var(--space-2);
+  padding: var(--space-4);
   flex-wrap: wrap;
 }
 
@@ -194,7 +201,7 @@ input:focus {
 
 .input-with-unit {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .input-with-unit select {
@@ -204,7 +211,7 @@ input:focus {
 .pf-presets {
   display: flex;
   gap: 6px;
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .pf-preset {
@@ -250,12 +257,12 @@ input:focus {
   border: none;
   border-top: 1px solid var(--color-border);
   border-radius: 0;
-  padding: 12px 0 0;
+  padding: var(--space-3) 0 0;
   margin: 6px 0;
 }
 
 .net-panel #node-load-fields .field-group > legend {
-  padding: 0 8px 0 0;
+  padding: 0 var(--space-2) 0 0;
   font-weight: 600;
   color: var(--color-text);
 }
@@ -276,7 +283,7 @@ input:focus {
   color: var(--color-text);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .net-section-summary::-webkit-details-marker {
@@ -498,7 +505,7 @@ input:focus {
 .result-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
   margin-bottom: 20px;
 }
 
@@ -526,7 +533,7 @@ input:focus {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: var(--space-4);
 }
 
 .recommendation h3 {
@@ -566,7 +573,7 @@ input:focus {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 4px 8px;
+  gap: var(--space-1) var(--space-2);
 }
 
 .result-item-status {
@@ -624,7 +631,7 @@ input:focus {
 .ref-table {
   width: 100%;
   border-collapse: collapse;
-  margin: 12px 0;
+  margin: var(--space-3) 0;
   font-size: 0.9rem;
 }
 
@@ -677,7 +684,7 @@ input:focus {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   cursor: pointer;
 }
 
@@ -728,7 +735,7 @@ input:focus {
   align-items: flex-end;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .net-projects-row:last-of-type {
@@ -812,7 +819,7 @@ input:focus {
   display: flex;
   align-items: stretch;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
   flex: 1 1 320px;
   min-width: 0;
 }
@@ -847,7 +854,7 @@ input:focus {
   width: 14px;
   height: 14px;
   vertical-align: -2px;
-  margin-right: 4px;
+  margin-right: var(--space-1);
   fill: none;
   stroke: currentColor;
   stroke-width: 1.5;
@@ -930,7 +937,7 @@ input:focus {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  padding: 12px 16px;
+  padding: var(--space-3) var(--space-4);
   margin-bottom: 18px;
 }
 
@@ -986,7 +993,7 @@ input:focus {
 .net-warning-item {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 8px 10px;
   background: var(--color-surface-alt);
   border-left: 3px solid var(--color-border);
@@ -1058,13 +1065,13 @@ input:focus {
 .net-bom-summary {
   cursor: pointer;
   list-style: none;
-  padding: 12px 16px;
+  padding: var(--space-3) var(--space-4);
   font-size: 1rem;
   font-weight: 600;
   color: var(--color-text);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .net-bom-summary::-webkit-details-marker {
@@ -1129,24 +1136,24 @@ input:focus {
 .net-bom-empty {
   color: var(--color-text-muted);
   font-size: 0.9rem;
-  margin: 8px 0 0;
+  margin: var(--space-2) 0 0;
 }
 
 .net-bom-note {
   color: var(--color-accent);
   font-size: 0.85rem;
-  margin: 4px 0 0;
+  margin: var(--space-1) 0 0;
 }
 
 /* --- Сравнение версий схемы ------------------------------------------------ */
 .net-diff {
-  margin-top: 12px;
+  margin-top: var(--space-3);
   border-top: 1px solid var(--color-border);
-  padding-top: 12px;
+  padding-top: var(--space-3);
 }
 
 .net-diff-title {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
   font-size: 0.95rem;
 }
 
@@ -1189,7 +1196,7 @@ input:focus {
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
   padding: 10px 12px;
   background: var(--color-surface);
   border: 1px solid var(--color-accent);
@@ -1206,13 +1213,13 @@ input:focus {
 
 .net-multi-actions > .btn-secondary {
   width: auto;
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   font-size: 0.9rem;
 }
 
 /* --- Поиск по дереву ------------------------------------------------------ */
 .net-search {
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .net-search-input {
@@ -1227,7 +1234,7 @@ input:focus {
 
 #network-search-status {
   display: block;
-  margin-top: 4px;
+  margin-top: var(--space-1);
   min-height: 1.1em;
 }
 
@@ -1246,9 +1253,9 @@ input:focus {
 .heatmap-legend {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 8px 12px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -1345,7 +1352,7 @@ input:focus {
   max-width: 100vw;
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
-  padding: 0 16px;
+  padding: 0 var(--space-4);
   box-sizing: border-box;
 }
 
@@ -1368,10 +1375,10 @@ input:focus {
   z-index: 2;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   width: fit-content;
-  margin-bottom: 8px;
-  padding: 4px;
+  margin-bottom: var(--space-2);
+  padding: var(--space-1);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -1415,10 +1422,10 @@ input:focus {
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   width: fit-content;
   max-width: min(440px, 100%);
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
   padding: 8px 10px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -1603,7 +1610,7 @@ input:focus {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   min-width: 130px;
   max-width: 190px;
   background: var(--color-surface);
@@ -1627,7 +1634,7 @@ input:focus {
   left: -7px;
   min-width: 16px;
   height: 16px;
-  padding: 0 4px;
+  padding: 0 var(--space-1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1716,7 +1723,7 @@ input:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-2);
   width: 100%;
 }
 
@@ -1755,7 +1762,7 @@ input:focus {
 
 .net-node-toolbar {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
   flex-shrink: 0;
 }
 
@@ -1854,7 +1861,7 @@ input:focus {
 
 /* Имя выбранного узла в заголовке сворачиваемой секции «Параметры узла». */
 .net-panel-summary-name {
-  margin-left: 4px;
+  margin-left: var(--space-1);
   color: var(--color-text-muted);
   font-weight: 400;
 }
@@ -1878,7 +1885,7 @@ input:focus {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   margin: 0 -14px 8px;
   padding: 10px 14px;
   background: var(--color-bg);
@@ -1920,8 +1927,8 @@ input:focus {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  margin: 0 0 16px;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-4);
   font-size: 0.82rem;
   line-height: 1.4;
 }
@@ -1955,7 +1962,7 @@ input:focus {
 .net-checkbox {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin: -4px 0 16px;
   color: var(--color-text);
   font-size: 0.95rem;
@@ -1965,7 +1972,7 @@ input:focus {
 .net-panel-result {
   margin-top: 18px;
   border-top: 1px solid var(--color-border);
-  padding-top: 16px;
+  padding-top: var(--space-4);
 }
 
 .formula-block {
@@ -1986,7 +1993,7 @@ input:focus {
   padding: 2px 6px;
   border-radius: var(--radius);
   display: inline-block;
-  margin: 4px 0;
+  margin: var(--space-1) 0;
 }
 
 .formula-block .note {
@@ -1995,7 +2002,7 @@ input:focus {
 }
 
 .formula-block dl {
-  margin: 8px 0;
+  margin: var(--space-2) 0;
 }
 
 .formula-block dt {
@@ -2018,7 +2025,7 @@ input:focus {
 
 .ref-toc strong {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
   margin-left: -16px;
 }
 
@@ -2039,10 +2046,10 @@ input:focus {
 
 .ref-chapter {
   margin-top: 32px;
-  margin-bottom: 12px;
-  padding-top: 16px;
+  margin-bottom: var(--space-3);
+  padding-top: var(--space-4);
   border-top: 2px solid var(--color-border);
-  scroll-margin-top: 16px;
+  scroll-margin-top: var(--space-4);
 }
 
 .ref-chapter:first-of-type {
@@ -2067,24 +2074,24 @@ input:focus {
 }
 
 .ref-links-line a {
-  margin-right: 4px;
+  margin-right: var(--space-1);
 }
 
 /* Мини-калькулятор тока КЗ */
 .sc-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0 16px;
+  gap: 0 var(--space-4);
 }
 
 .sc-calc .btn-primary {
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 #sc-result {
   margin-top: 14px;
   border-top: 1px solid var(--color-border);
-  padding-top: 12px;
+  padding-top: var(--space-3);
 }
 
 /* Поиск по глоссарию */
@@ -2105,7 +2112,7 @@ input:focus {
   text-align: center;
   color: var(--color-text-muted);
   font-size: 0.8rem;
-  padding: 16px;
+  padding: var(--space-4);
 }
 
 /* ===========================================================================
@@ -2115,7 +2122,7 @@ input:focus {
    =========================================================================== */
 @media (max-width: 600px) {
   .app-header {
-    padding: 16px 12px 4px;
+    padding: var(--space-4) var(--space-3) var(--space-1);
   }
 
   .app-header h1 {
