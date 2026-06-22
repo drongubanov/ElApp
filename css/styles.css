@@ -155,6 +155,40 @@ input:focus {
   color: var(--color-danger);
 }
 
+/* Поле с единицей измерения внутри: единица показывается серым суффиксом у
+   правого края, а не в подписи. Ширина обёртки совпадает с шириной поля, чтобы
+   суффикс вставал у его правого края. Спиннеры number-инпута убраны, чтобы не
+   наезжать на суффикс (для десятичных инженерных значений они бесполезны). */
+.input-suffix {
+  position: relative;
+  display: block;
+  max-width: 360px;
+}
+
+.input-suffix > input {
+  width: 100%;
+  padding-right: 2.8em;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.input-suffix > input::-webkit-outer-spin-button,
+.input-suffix > input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.input-suffix::after {
+  content: attr(data-suffix);
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
 .input-with-unit {
   display: flex;
   gap: 8px;

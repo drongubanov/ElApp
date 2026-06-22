@@ -411,8 +411,10 @@
           </div>
 
           <div class="field">
-            <label for="node-voltage">Напряжение, U (В)</label>
-            <input type="number" id="node-voltage" inputmode="decimal" step="any" min="0" placeholder="220" />
+            <label for="node-voltage">Напряжение, U</label>
+            <div class="input-suffix" data-suffix="В">
+              <input type="number" id="node-voltage" inputmode="decimal" step="any" min="0" placeholder="220" />
+            </div>
           </div>
 
           <div class="field" id="node-pf-field">
@@ -445,8 +447,10 @@
           </div>
 
           <div class="field" id="node-current-field" hidden>
-            <label for="node-current-value">Ток, I (А)</label>
-            <input type="number" id="node-current-value" inputmode="decimal" step="any" min="0" placeholder="10" />
+            <label for="node-current-value">Ток, I</label>
+            <div class="input-suffix" data-suffix="А">
+              <input type="number" id="node-current-value" inputmode="decimal" step="any" min="0" placeholder="10" />
+            </div>
           </div>
 
           <fieldset class="field-group" id="node-realload-fieldset">
@@ -497,12 +501,16 @@
             Без этих параметров остальной расчёт сети не меняется.
           </p>
           <div class="field">
-            <label for="node-transformer-power">Номинальная мощность трансформатора, Sт (кВА)</label>
-            <input type="number" id="node-transformer-power" inputmode="decimal" step="any" min="0" placeholder="не учитывать" />
+            <label for="node-transformer-power">Номинальная мощность трансформатора, Sт</label>
+            <div class="input-suffix" data-suffix="кВА">
+              <input type="number" id="node-transformer-power" inputmode="decimal" step="any" min="0" placeholder="не учитывать" />
+            </div>
           </div>
           <div class="field">
-            <label for="node-transformer-uk">Напряжение короткого замыкания, uк (%)</label>
-            <input type="number" id="node-transformer-uk" inputmode="decimal" step="0.1" min="0" placeholder="напр. 4,5" />
+            <label for="node-transformer-uk">Напряжение короткого замыкания, uк</label>
+            <div class="input-suffix" data-suffix="%">
+              <input type="number" id="node-transformer-uk" inputmode="decimal" step="0.1" min="0" placeholder="напр. 4,5" />
+            </div>
           </div>
           <div class="field">
             <label for="node-earthing-system">Система заземления</label>
@@ -532,13 +540,17 @@
           </div>
 
           <div class="field">
-            <label for="node-cable-count">Кабелей рядом, шт.</label>
-            <input type="number" id="node-cable-count" inputmode="numeric" step="1" min="1" value="1" />
+            <label for="node-cable-count">Кабелей рядом</label>
+            <div class="input-suffix" data-suffix="шт">
+              <input type="number" id="node-cable-count" inputmode="numeric" step="1" min="1" value="1" />
+            </div>
           </div>
 
           <div class="field">
-            <label for="node-ambient-temp">Температура окружающей среды, °C</label>
-            <input type="number" id="node-ambient-temp" inputmode="decimal" step="1" min="-40" max="89" value="25" />
+            <label for="node-ambient-temp">Температура окружающей среды</label>
+            <div class="input-suffix" data-suffix="°C">
+              <input type="number" id="node-ambient-temp" inputmode="decimal" step="1" min="-40" max="89" value="25" />
+            </div>
             <p class="note">
               Базовая температура табличных токов — +25 °C. Выше неё допустимый ток жилы снижается
               (поправочный коэффициент по ГОСТ Р МЭК 60364-5-52 / ПУЭ табл. 1.3.3).
@@ -554,8 +566,10 @@
           </div>
 
           <div class="field">
-            <label for="node-cable-length">Длина линии, L (м)</label>
-            <input type="number" id="node-cable-length" inputmode="decimal" step="any" min="0" placeholder="не учитывать" />
+            <label for="node-cable-length">Длина линии, L</label>
+            <div class="input-suffix" data-suffix="м">
+              <input type="number" id="node-cable-length" inputmode="decimal" step="any" min="0" placeholder="не учитывать" />
+            </div>
           </div>
         </fieldset>
 
