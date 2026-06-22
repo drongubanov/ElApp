@@ -181,6 +181,8 @@ const netWarningsList = document.getElementById('net-warnings-list');
 const networkBom = document.getElementById('network-bom');
 const netBomCount = document.getElementById('net-bom-count');
 const netBomBody = document.getElementById('net-bom-body');
+const netEmptyState = document.getElementById('net-empty-state');
+const netEmptyCalcBtn = document.getElementById('net-empty-calc-btn');
 const networkSearchInput = document.getElementById('network-search');
 const networkSearchStatus = document.getElementById('network-search-status');
 const nodeAddMenu = document.getElementById('node-add-menu');
@@ -1570,6 +1572,8 @@ function renderMultiActions() {
  * расчёта (lastResultTree); до него скрыта.
  */
 function renderWarnings() {
+  // Пустое состояние видно, пока сеть не рассчитана, и зовёт нажать «Рассчитать».
+  if (netEmptyState) netEmptyState.hidden = Boolean(lastResultTree);
   if (!lastResultTree) {
     networkWarnings.hidden = true;
     return;
@@ -2698,6 +2702,9 @@ function performUndo() {
 }
 
 undoNetworkBtn.addEventListener('click', performUndo);
+
+// CTA пустого состояния запускает тот же расчёт, что и кнопка тулбара.
+if (netEmptyCalcBtn) netEmptyCalcBtn.addEventListener('click', () => calcNetworkBtn.click());
 
 heatmapToggleBtn.addEventListener('click', () => {
   heatMapEnabled = !heatMapEnabled;

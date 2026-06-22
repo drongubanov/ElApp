@@ -427,6 +427,58 @@ input:focus {
   color: var(--color-text);
 }
 
+/* Явное пустое состояние: показывается, пока сеть не рассчитана, и зовёт к
+   действию. Прячется после первого расчёта (renderWarnings), снова появляется
+   после сброса/отмены/смены схемы. */
+.net-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 28px 20px;
+  margin-bottom: 18px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
+}
+
+.net-empty-state[hidden] {
+  display: none;
+}
+
+.net-empty-icon {
+  width: 40px;
+  height: 40px;
+  fill: none;
+  stroke: var(--color-text-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.65;
+  margin-bottom: 2px;
+}
+
+.net-empty-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.net-empty-text {
+  margin: 0;
+  max-width: 440px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.net-empty-cta {
+  width: auto;
+  margin-top: 10px;
+  padding: 10px 22px;
+}
+
 .error-message {
   color: var(--color-danger);
   min-height: 1.2em;
