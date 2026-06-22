@@ -153,6 +153,10 @@ const exportSpecBtn = document.getElementById('export-spec-btn');
 const exportSpecPdfBtn = document.getElementById('export-spec-pdf-btn');
 const exportBomBtn = document.getElementById('export-bom-btn');
 const resetNetworkBtn = document.getElementById('reset-network-btn');
+const netToast = document.getElementById('net-toast');
+const netToastMessage = document.getElementById('net-toast-message');
+const netToastAction = document.getElementById('net-toast-action');
+const netToastClose = document.getElementById('net-toast-close');
 const networkProjectSelect = document.getElementById('network-project-select');
 const openProjectBtn = document.getElementById('open-project-btn');
 const saveProjectAsBtn = document.getElementById('save-project-as-btn');
@@ -2913,8 +2917,42 @@ importProjectInput.addEventListener('change', () => {
   reader.readAsText(file);
 });
 
+// --- Немодальный тост с откатом --------------------------------------------
+let netToastTimer = null;
+let netToastActionHandler = null;
+
+function hideToast() {
+  if (netToastTimer) {
+    clearTimeout(netToastTimer);
+    netToastTimer = null;
+  }
+  if (netToast) netToast.hidden = true;
+  netToastActionHandler = null;
+}
+
+function showUndoToast(message, actionLabel, onAction, timeout = 7000) {
+  if (!netToast) return;
+  netToastMessage.textContent = message;
+  netToastAction.textContent = actionLabel;
+  netToastAction.hidden = !onAction;
+  netToastActionHandler = onAction || null;
+  netToast.hidden = false;
+  if (netToastTimer) clearTimeout(netToastTimer);
+  netToastTimer = setTimeout(hideToast, timeout);
+}
+
+if (netToast) {
+  netToastAction.addEventListener('click', () => {
+    const handler = netToastActionHandler;
+    hideToast();
+    if (handler) handler();
+  });
+  netToastClose.addEventListener('click', hideToast);
+}
+
 resetNetworkBtn.addEventListener('click', () => {
-  if (!confirm('Удалить все узлы и параметры сети и начать сначала?')) return;
+  // Обратимая операция: вместо блокирующего confirm() сразу сбрасываем сеть и
+  // показываем немодальный тост с кнопкой «Отменить» (сброс уже снят в undo).
   pushUndo();
   networkTree = buildDefaultTree();
   selectedNodeId = networkTree.id;
@@ -2930,6 +2968,7 @@ resetNetworkBtn.addEventListener('click', () => {
   renderWarnings();
   renderBom();
   renderProjectList();
+  showUndoToast('Сеть сброшена к схеме по умолчанию.', 'Отменить', performUndo);
 });
 
 networkProjectSelect.addEventListener('change', () => updateProjectControlsUI());
