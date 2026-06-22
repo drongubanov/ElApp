@@ -576,6 +576,7 @@ let selectedNodeIds = new Set();
 let lastCalcMap = null;
 let lastResultTree = null;
 let warningsByNode = new Map(); // nodeId -> массив замечаний для бейджа-точки на карточке
+let changedValueIds = new Set(); // узлы с изменившимся бейджем — для подсветки при пересчёте
 let activeProjectId = null;
 let draggedNodeId = null;
 let searchQuery = '';
@@ -933,6 +934,29 @@ const NODE_KIND_TITLES = {
   socket: 'Розеточная группа',
   load: 'Потребитель',
 };
+
+// Текст бейджа результата узла (ток · номинал автомата либо «ошибка расчёта»).
+// Вынесен, чтобы один и тот же текст использовался и при отрисовке карточки, и
+// при сравнении «до/после» для подсветки изменившихся значений.
+function nodeBadgeText(calc) {
+  if (!calc) return '';
+  if (calc.error) return 'ошибка расчёта';
+  const breakerText = calc.protection.breaker ? `АВ ${calc.protection.breaker} А` : 'АВ вне диапазона';
+  return `${formatCurrent(calc.result.I)} · ${breakerText}`;
+}
+
+// Множество узлов, у которых отображаемый бейдж (ток/номинал) изменился по
+// сравнению с предыдущим расчётом — для микро-анимации при пересчёте. При
+// первом расчёте (prev отсутствует) ничего не подсвечиваем.
+function computeChangedValueIds(prevMap, nextMap) {
+  const ids = new Set();
+  if (!prevMap) return ids;
+  nextMap.forEach((calc, id) => {
+    const before = prevMap.get(id);
+    if (before && nodeBadgeText(before) !== nodeBadgeText(calc)) ids.add(id);
+  });
+  return ids;
+}
 
 function nodeMeta(node) {
   if (node.hasOwnLoad) return `${NETWORK_SHORT_LABELS[node.networkType] ?? ''} ${node.voltage} В`;
@@ -1457,13 +1481,12 @@ function renderNodeEl(node) {
   if (calc) {
     const badge = document.createElement('span');
     badge.className = 'net-node-badge';
-    if (calc.error) {
-      badge.classList.add('warn');
-      badge.textContent = 'ошибка расчёта';
-    } else {
-      const breakerText = calc.protection.breaker ? `АВ ${calc.protection.breaker} А` : 'АВ вне диапазона';
-      badge.textContent = `${formatCurrent(calc.result.I)} · ${breakerText}`;
-    }
+    if (calc.error) badge.classList.add('warn');
+    badge.textContent = nodeBadgeText(calc);
+    // Микро-анимация: подсвечиваем бейджи, чьи ток/номинал изменились после
+    // пересчёта. changedValueIds наполняется только на момент расчёта и сразу
+    // очищается, поэтому подсветка не повторяется при обычных перерисовках.
+    if (changedValueIds.has(node.id)) badge.classList.add('changed');
     card.appendChild(badge);
   }
 
@@ -2658,15 +2681,20 @@ nodeAddReceiverBtn.addEventListener('click', () => {
 
 calcNetworkBtn.addEventListener('click', () => {
   if (!networkTree) return;
+  const prevCalcMap = lastCalcMap;
   const resultTree = annotateVoltageDrop(networkTree, annotateShortCircuit(networkTree, calculateTree(networkTree)));
   lastResultTree = resultTree;
   lastCalcMap = flattenCalc(resultTree);
+  // Какие бейджи изменились с прошлого расчёта — подсветим их разово при отрисовке.
+  changedValueIds = computeChangedValueIds(prevCalcMap, lastCalcMap);
   const errors = collectErrors(resultTree);
   networkErrorMessage.textContent = errors.length ? `Не удалось рассчитать: ${errors.join('; ')}.` : '';
   renderTree();
   renderPanel();
   renderWarnings();
   renderBom();
+  // Сбрасываем, чтобы подсветка проигралась один раз, а не при каждом ререндере.
+  changedValueIds = new Set();
 });
 
 networkSearchInput.addEventListener('input', () => {
