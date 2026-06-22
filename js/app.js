@@ -1856,6 +1856,80 @@ networkTreeEl.addEventListener('transitionend', (event) => {
   if (event.propertyName === 'transform') updateMinimap();
 });
 
+// --- Клавиатурная навигация по дереву (паттерн WAI-ARIA tree) ---------------
+// Делегируется на контейнер дерева, поэтому переживает перерисовки карточек.
+// ↑/↓ — между видимыми узлами (в порядке обхода), Home/End — к краям,
+// → — раскрыть ветвь либо перейти к первому ребёнку, ← — свернуть либо перейти
+// к родителю. Enter/Пробел (выбор) остаются на самой карточке.
+function visibleCardIds() {
+  return [...networkTreeEl.querySelectorAll('.net-node-wrap')].map((w) => w.dataset.id);
+}
+
+function focusNodeCard(id) {
+  requestAnimationFrame(() => {
+    networkTreeEl.querySelector(`.net-node-wrap[data-id="${id}"] .net-node`)?.focus();
+  });
+}
+
+function selectAndFocusCard(id) {
+  selectNode(id);
+  focusNodeCard(id);
+}
+
+networkTreeEl.addEventListener('keydown', (event) => {
+  const card = event.target.closest('.net-node');
+  if (!card) return;
+  const id = card.closest('.net-node-wrap')?.dataset.id;
+  const node = id && findNode(networkTree, id);
+  if (!node) return;
+
+  switch (event.key) {
+    case 'ArrowDown':
+    case 'ArrowUp': {
+      event.preventDefault();
+      const ids = visibleCardIds();
+      const next = ids[ids.indexOf(id) + (event.key === 'ArrowDown' ? 1 : -1)];
+      if (next) selectAndFocusCard(next);
+      break;
+    }
+    case 'Home':
+    case 'End': {
+      event.preventDefault();
+      const ids = visibleCardIds();
+      const target = event.key === 'Home' ? ids[0] : ids[ids.length - 1];
+      if (target && target !== id) selectAndFocusCard(target);
+      break;
+    }
+    case 'ArrowRight': {
+      event.preventDefault();
+      if (node.children.length && node.collapsed) {
+        node.collapsed = false;
+        persistNetworkScheme();
+        renderTree();
+        focusNodeCard(id);
+      } else if (node.children.length) {
+        selectAndFocusCard(node.children[0].id);
+      }
+      break;
+    }
+    case 'ArrowLeft': {
+      event.preventDefault();
+      if (node.children.length && !node.collapsed) {
+        node.collapsed = true;
+        persistNetworkScheme();
+        renderTree();
+        focusNodeCard(id);
+      } else {
+        const parent = findParentNode(networkTree, id);
+        if (parent) selectAndFocusCard(parent.id);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+});
+
 // Компактное представление тока для надписи внутри кружка на линии —
 // без единицы измерения (не помещается рядом с числом в круге малого
 // радиуса), точность снижается для больших значений, чтобы текст влезал.
