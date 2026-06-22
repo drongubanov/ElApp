@@ -201,13 +201,20 @@ const netPanelTitle = document.getElementById('net-panel-title');
 const netPanelCollapseBtn = document.getElementById('net-panel-collapse-btn');
 const netBreadcrumb = document.getElementById('net-breadcrumb');
 
+// Уважаем системную настройку «уменьшить движение»: плавную прокрутку заменяем
+// мгновенной (CSS-анимации/переходы глушит media-запрос в styles.css).
+const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+function scrollBehavior() {
+  return reducedMotionQuery.matches ? 'auto' : 'smooth';
+}
+
 // Кнопка «Свернуть» в липком заголовке панели — сворачивает секцию параметров
 // прямо из глубины длинной формы и возвращает к её заголовку, чтобы не
 // прокручивать вручную.
 if (netPanelCollapseBtn && netPanelSection) {
   netPanelCollapseBtn.addEventListener('click', () => {
     netPanelSection.open = false;
-    netPanelSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    netPanelSection.scrollIntoView({ behavior: scrollBehavior(), block: 'nearest' });
   });
 }
 
@@ -505,7 +512,7 @@ CABLE_TABLE.forEach((row) => {
 
 gotoRefTableBtn.addEventListener('click', () => {
   switchTab('about');
-  refCableTableBody.querySelector('tr.highlight')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  refCableTableBody.querySelector('tr.highlight')?.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
 });
 
 function createNode(overrides = {}) {
@@ -705,7 +712,7 @@ function revealNode(nodeId) {
   requestAnimationFrame(() => {
     networkTreeEl
       .querySelector(`.net-node-wrap[data-id="${nodeId}"]`)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      ?.scrollIntoView({ behavior: scrollBehavior(), block: 'center', inline: 'center' });
   });
 }
 
@@ -720,7 +727,7 @@ function revealWarning(nodeId) {
     activeWarningFilter = null;
     renderWarnings();
   }
-  networkWarnings.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  networkWarnings.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
   requestAnimationFrame(() => {
     const items = netWarningsList.querySelectorAll(`.net-warning-item[data-node-id="${nodeId}"]`);
     items.forEach((item) => {
@@ -3449,7 +3456,7 @@ document.addEventListener('click', (event) => {
   if (!targetId) return;
   switchTab('about');
   requestAnimationFrame(() => {
-    document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById(targetId)?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
   });
 });
 
