@@ -331,6 +331,22 @@
         <div class="net-bom-body" id="net-bom-body"></div>
       </details>
 
+      <div class="net-empty-state" id="net-empty-state">
+        <svg class="net-empty-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+          <rect x="9" y="6" width="30" height="36" rx="3" />
+          <line x1="15" y1="14" x2="33" y2="14" />
+          <line x1="15" y1="22" x2="24" y2="22" />
+          <line x1="15" y1="29" x2="22" y2="29" />
+          <path d="M27 33l4 4 8-9" />
+        </svg>
+        <p class="net-empty-title">Сеть ещё не рассчитана</p>
+        <p class="net-empty-text">
+          Соберите дерево узлов и нажмите «Рассчитать сеть» — подберём автоматы и кабели
+          для всех линий и проверим схему: токи, потерю напряжения, баланс и селективность.
+        </p>
+        <button type="button" class="btn-primary net-empty-cta" id="net-empty-calc-btn">Рассчитать сеть</button>
+      </div>
+
       <div class="net-search">
         <input type="search" id="network-search" class="net-search-input"
           placeholder="Поиск узла по названию…" aria-label="Поиск узла по названию" autocomplete="off" />
