@@ -1277,11 +1277,26 @@ input:focus {
   white-space: nowrap;
 }
 
-.heatmap-legend-bar {
+.heatmap-legend-scale {
+  display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
   min-width: 80px;
+  gap: 2px;
+}
+
+.heatmap-legend-bar {
   height: 10px;
   border-radius: 5px;
+}
+
+/* Подписи смысловых диапазонов нагрузки под градиентом — поясняют, что
+   синий/циан конец шкалы означает низкую нагрузку, а оранжевый/красный —
+   близкую к пределу автомата/кабеля, без необходимости запоминать градиент. */
+.heatmap-legend-bands {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
 }
 
 /* --- Меню добавления узла (пустой узел + шаблоны) -------------------------- */
