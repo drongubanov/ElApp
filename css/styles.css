@@ -2147,3 +2147,19 @@ input:focus {
     max-width: none;
   }
 }
+
+/* --- Уменьшенное движение (prefers-reduced-motion) -------------------------- */
+/* Пользователям, попросившим систему уменьшить анимацию, глушим переходы и
+   keyframes-анимации (зум дерева, подсветка бейджей/замечаний, пульс
+   изменившихся значений, ховер-подъём карточек и т.п.). Плавную прокрутку в JS
+   отдельно заменяет scrollBehavior() в app.js. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
