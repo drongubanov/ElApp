@@ -1820,6 +1820,28 @@ input:focus {
   color: var(--color-danger);
 }
 
+/* Микро-анимация при пересчёте: бейдж с изменившимся током/номиналом коротко
+   «пульсирует» (масштаб + свечение), привлекая внимание к обновлению. */
+@keyframes net-badge-flash {
+  0% {
+    transform: scale(1);
+    text-shadow: 0 0 0 transparent;
+  }
+  25% {
+    transform: scale(1.22);
+    text-shadow: 0 0 10px var(--color-accent);
+  }
+  100% {
+    transform: scale(1);
+    text-shadow: 0 0 0 transparent;
+  }
+}
+
+.net-node-badge.changed {
+  display: inline-block;
+  animation: net-badge-flash 0.9s ease-out;
+}
+
 /* Панель параметров узла теперь живёт внутри сворачиваемой секции
    .net-panel-section — рамку, фон и внешние отступы даёт сама секция,
    поэтому у самой панели они убраны, чтобы не было двойной рамки. */
