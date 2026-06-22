@@ -353,6 +353,17 @@ input:focus {
   color: var(--color-text);
 }
 
+/* Деструктивное действие — приглушённый опасный цвет в покое, явный при наведении. */
+.btn-danger {
+  color: var(--color-danger);
+}
+
+.btn-danger:hover {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  background: rgba(248, 113, 113, 0.1);
+}
+
 .error-message {
   color: var(--color-danger);
   min-height: 1.2em;
@@ -664,18 +675,42 @@ input:focus {
   margin-bottom: 10px;
 }
 
-/* Действия делят строку поровну; меню экспорта (обёртка) ведёт себя как кнопка.
-   При нехватке места строка переносится (flex-wrap), а min-width: 0 не даёт
-   длинным надписям ломать раскладку. */
-.net-actions > .btn-primary,
-.net-actions > .btn-secondary,
-.net-actions > .net-export-menu {
-  flex: 1 1 140px;
+/* Действия сгруппированы по смыслу: первичное (расчёт) — отдельной строкой
+   сверху и выделено; «вид + экспорт» — группой; деструктивное (сброс) —
+   отодвинуто вправо и помечено опасным цветом, чтобы не нажать случайно.
+   При нехватке места строки переносятся (flex-wrap). */
+.net-actions > .btn-primary {
+  flex: 1 1 100%;
+  width: auto;
+  border: 1px solid transparent;
+  padding: 12px 20px;
+  font-size: 1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.net-actions-group {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 1 1 320px;
   min-width: 0;
 }
 
-.net-actions > .btn-primary,
-.net-actions > .btn-secondary,
+.net-actions-group > .btn-secondary,
+.net-actions-group > .net-export-menu {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+
+.net-actions > .btn-danger {
+  flex: 0 1 200px;
+  margin-left: auto;
+}
+
+.net-actions .btn-secondary,
 .net-export-menu > .btn-export {
   width: auto;
   padding: 12px 10px;
@@ -684,12 +719,6 @@ input:focus {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* Прозрачная рамка у основной кнопки — чтобы её border-box совпадал
-   с кнопками экспорта/сброса (у тех рамка 1px) и ширина была одинаковой. */
-.net-actions > .btn-primary {
-  border: 1px solid transparent;
 }
 
 /* --- Выпадающее меню экспорта --------------------------------------------- */
