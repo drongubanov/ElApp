@@ -200,6 +200,17 @@ const netPanelSummaryName = document.getElementById('net-panel-summary-name');
 const netPanelTitle = document.getElementById('net-panel-title');
 const netPanelCollapseBtn = document.getElementById('net-panel-collapse-btn');
 const netBreadcrumb = document.getElementById('net-breadcrumb');
+const pdfBackdropUploadBtn = document.getElementById('pdf-backdrop-upload-btn');
+const pdfBackdropInput = document.getElementById('pdf-backdrop-input');
+const pdfBackdropRemoveBtn = document.getElementById('pdf-backdrop-remove-btn');
+const pdfBackdropControls = document.getElementById('pdf-backdrop-controls');
+const pdfBackdropEl = document.getElementById('net-pdf-backdrop');
+const pdfBackdropStatus = document.getElementById('pdf-backdrop-status');
+const pdfBackdropPrevBtn = document.getElementById('pdf-backdrop-prev-btn');
+const pdfBackdropNextBtn = document.getElementById('pdf-backdrop-next-btn');
+const pdfBackdropPageLabel = document.getElementById('pdf-backdrop-page-label');
+const pdfBackdropOpacityInput = document.getElementById('pdf-backdrop-opacity');
+const pdfBackdropVisibleInput = document.getElementById('pdf-backdrop-visible');
 
 // Уважаем системную настройку «уменьшить движение»: плавную прокрутку заменяем
 // мгновенной (CSS-анимации/переходы глушит media-запрос в styles.css).
@@ -333,7 +344,9 @@ const TREE_ZOOM_STEP = 0.1;
 
 function setTreeZoom(value) {
   treeZoom = Math.min(TREE_ZOOM_MAX, Math.max(TREE_ZOOM_MIN, Math.round(value * 10) / 10));
-  networkTreeEl.style.transform = treeZoom === 1 ? '' : `scale(${treeZoom})`;
+  const transform = treeZoom === 1 ? '' : `scale(${treeZoom})`;
+  networkTreeEl.style.transform = transform;
+  pdfBackdropEl.style.transform = transform;
   netZoomResetBtn.textContent = `${Math.round(treeZoom * 100)}%`;
   netZoomOutBtn.disabled = treeZoom <= TREE_ZOOM_MIN;
   netZoomInBtn.disabled = treeZoom >= TREE_ZOOM_MAX;
@@ -459,6 +472,130 @@ window.addEventListener('mouseup', () => {
   isPanningTree = false;
   networkTreeWrapperEl.classList.remove('is-panning');
 });
+
+// --- PDF-подложка для трассировки схемы -------------------------------------
+// PDF.js вендорится локально (vendor/pdfjs/) и подключается лениво — только
+// когда пользователь впервые загружает PDF, чтобы не тянуть ~1.6 МБ библиотеки
+// при каждом открытии вкладки. Страница рендерится в canvas и показывается
+// полупрозрачным фоном внутри #network-tree-wrapper (тот же контейнер, что
+// скроллится и куда применяется treeZoom), поэтому подложка панорамируется и
+// масштабируется синхронно с деревом без отдельной геометрии. Файл не
+// передаётся за пределы браузера — только локальный рендер.
+let pdfBackdropDoc = null;
+let pdfBackdropPageNum = 1;
+let pdfjsLibPromise = null;
+
+function loadPdfjsLib() {
+  if (!pdfjsLibPromise) {
+    pdfjsLibPromise = import('../vendor/pdfjs/pdf.min.mjs').then((lib) => {
+      lib.GlobalWorkerOptions.workerSrc = new URL('../vendor/pdfjs/pdf.worker.min.mjs', import.meta.url).href;
+      return lib;
+    });
+  }
+  return pdfjsLibPromise;
+}
+
+function updatePdfBackdropVisibility() {
+  pdfBackdropEl.hidden = !pdfBackdropDoc || !pdfBackdropVisibleInput.checked;
+}
+
+function applyPdfBackdropOpacity() {
+  pdfBackdropEl.style.opacity = String(Number(pdfBackdropOpacityInput.value) / 100);
+}
+
+// Рендерим страницу под целевой размер ~1400×1000 CSS px при масштабе дерева
+// 100% — этого достаточно, чтобы прочитать подписи на схеме, и не даёт
+// подложке оказаться намного выше дерева (вертикальная панорама холста держится
+// на window.scrollY, а не на собственном скролле wrapper'а, поэтому слишком
+// высокая подложка рисковала бы оказаться недосягаемой для перетаскивания).
+async function renderPdfBackdropPage() {
+  if (!pdfBackdropDoc) return;
+  pdfBackdropStatus.textContent = 'Рендеринг страницы…';
+  try {
+    const page = await pdfBackdropDoc.getPage(pdfBackdropPageNum);
+    const baseViewport = page.getViewport({ scale: 1 });
+    const targetScale = Math.min(
+      3,
+      Math.max(0.3, Math.min(1400 / baseViewport.width, 1000 / baseViewport.height))
+    );
+    const viewport = page.getViewport({ scale: targetScale });
+    const dpr = window.devicePixelRatio || 1;
+
+    let canvas = pdfBackdropEl.querySelector('canvas');
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      pdfBackdropEl.appendChild(canvas);
+    }
+    canvas.width = Math.ceil(viewport.width * dpr);
+    canvas.height = Math.ceil(viewport.height * dpr);
+    canvas.style.width = `${viewport.width}px`;
+    canvas.style.height = `${viewport.height}px`;
+
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    pdfBackdropPageLabel.textContent = `Стр. ${pdfBackdropPageNum} из ${pdfBackdropDoc.numPages}`;
+    pdfBackdropPrevBtn.disabled = pdfBackdropPageNum <= 1;
+    pdfBackdropNextBtn.disabled = pdfBackdropPageNum >= pdfBackdropDoc.numPages;
+    pdfBackdropStatus.textContent = '';
+  } catch {
+    pdfBackdropStatus.textContent = 'Не удалось отрендерить страницу PDF.';
+  }
+}
+
+pdfBackdropUploadBtn.addEventListener('click', () => pdfBackdropInput.click());
+
+pdfBackdropInput.addEventListener('change', async () => {
+  const file = pdfBackdropInput.files?.[0];
+  pdfBackdropInput.value = '';
+  if (!file) return;
+
+  pdfBackdropStatus.textContent = 'Загрузка PDF…';
+  try {
+    const lib = await loadPdfjsLib();
+    const data = await file.arrayBuffer();
+    pdfBackdropDoc = await lib.getDocument({ data }).promise;
+    pdfBackdropPageNum = 1;
+    pdfBackdropControls.hidden = false;
+    pdfBackdropRemoveBtn.hidden = false;
+    pdfBackdropVisibleInput.checked = true;
+    updatePdfBackdropVisibility();
+    applyPdfBackdropOpacity();
+    setTreeZoom(treeZoom);
+    dismissCanvasHint();
+    await renderPdfBackdropPage();
+  } catch {
+    pdfBackdropStatus.textContent = 'Не удалось прочитать файл как PDF.';
+    pdfBackdropDoc = null;
+    updatePdfBackdropVisibility();
+  }
+});
+
+pdfBackdropRemoveBtn.addEventListener('click', () => {
+  pdfBackdropDoc = null;
+  pdfBackdropPageNum = 1;
+  pdfBackdropEl.innerHTML = '';
+  pdfBackdropControls.hidden = true;
+  pdfBackdropRemoveBtn.hidden = true;
+  pdfBackdropStatus.textContent = '';
+  updatePdfBackdropVisibility();
+});
+
+pdfBackdropPrevBtn.addEventListener('click', () => {
+  if (pdfBackdropPageNum <= 1) return;
+  pdfBackdropPageNum -= 1;
+  renderPdfBackdropPage();
+});
+
+pdfBackdropNextBtn.addEventListener('click', () => {
+  if (!pdfBackdropDoc || pdfBackdropPageNum >= pdfBackdropDoc.numPages) return;
+  pdfBackdropPageNum += 1;
+  renderPdfBackdropPage();
+});
+
+pdfBackdropOpacityInput.addEventListener('input', applyPdfBackdropOpacity);
+pdfBackdropVisibleInput.addEventListener('change', updatePdfBackdropVisibility);
 
 function updateNetworkTypeUI() {
   const type = networkTypeSelect.value;
