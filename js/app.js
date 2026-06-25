@@ -132,6 +132,8 @@ const netZoomOutBtn = document.getElementById('net-zoom-out-btn');
 const netZoomInBtn = document.getElementById('net-zoom-in-btn');
 const netZoomResetBtn = document.getElementById('net-zoom-reset-btn');
 const netZoomFitBtn = document.getElementById('net-zoom-fit-btn');
+const netExpandAllBtn = document.getElementById('net-expand-all-btn');
+const netCollapseAllBtn = document.getElementById('net-collapse-all-btn');
 const netMinimap = document.getElementById('net-minimap');
 const netMinimapThumb = document.getElementById('net-minimap-thumb');
 const netCanvasHint = document.getElementById('net-canvas-hint');
@@ -139,6 +141,7 @@ const netCanvasHintClose = document.getElementById('net-canvas-hint-close');
 const calcNetworkBtn = document.getElementById('calc-network-btn');
 const undoNetworkBtn = document.getElementById('undo-network-btn');
 const heatmapToggleBtn = document.getElementById('heatmap-toggle-btn');
+const currentToggleBtn = document.getElementById('current-toggle-btn');
 const heatmapLegend = document.getElementById('heatmap-legend');
 const heatmapLegendMin = document.getElementById('heatmap-legend-min');
 const heatmapLegendMax = document.getElementById('heatmap-legend-max');
@@ -182,18 +185,34 @@ const networkBom = document.getElementById('network-bom');
 const netBomCount = document.getElementById('net-bom-count');
 const netBomBody = document.getElementById('net-bom-body');
 const netEmptyState = document.getElementById('net-empty-state');
+const netEmptyTitle = document.getElementById('net-empty-title');
+const netEmptyText = document.getElementById('net-empty-text');
 const netEmptyCalcBtn = document.getElementById('net-empty-calc-btn');
 const networkSearchInput = document.getElementById('network-search');
 const networkSearchStatus = document.getElementById('network-search-status');
 const nodeAddMenu = document.getElementById('node-add-menu');
 const nodeContextMenu = document.getElementById('node-context-menu');
+const contextCopyBtn = document.getElementById('context-copy-btn');
+const contextPasteBtn = document.getElementById('context-paste-btn');
 const contextDuplicateBtn = document.getElementById('context-duplicate-btn');
 const contextDeleteBtn = document.getElementById('context-delete-btn');
 const netMultiActions = document.getElementById('net-multi-actions');
 const netMultiCount = document.getElementById('net-multi-count');
+const multiBulkEditBtn = document.getElementById('multi-bulk-edit-btn');
 const multiDuplicateBtn = document.getElementById('multi-duplicate-btn');
 const multiDeleteBtn = document.getElementById('multi-delete-btn');
 const multiClearBtn = document.getElementById('multi-clear-btn');
+const netBulkEditPanel = document.getElementById('net-bulk-edit-panel');
+const bulkApplyInstallation = document.getElementById('bulk-apply-installation');
+const bulkInstallation = document.getElementById('bulk-installation');
+const bulkApplyInsulation = document.getElementById('bulk-apply-insulation');
+const bulkInsulation = document.getElementById('bulk-insulation');
+const bulkApplyAmbient = document.getElementById('bulk-apply-ambient');
+const bulkAmbient = document.getElementById('bulk-ambient');
+const bulkApplyPf = document.getElementById('bulk-apply-pf');
+const bulkPf = document.getElementById('bulk-pf');
+const bulkEditApplyBtn = document.getElementById('bulk-edit-apply-btn');
+const bulkEditCancelBtn = document.getElementById('bulk-edit-cancel-btn');
 const networkPanel = document.getElementById('network-panel');
 const netPanelSection = document.getElementById('net-panel-section');
 const netPanelSummaryName = document.getElementById('net-panel-summary-name');
@@ -219,6 +238,7 @@ if (netPanelCollapseBtn && netPanelSection) {
 }
 
 const nodeNameInput = document.getElementById('node-name');
+const nodeCommentInput = document.getElementById('node-comment');
 const nodeHasOwnLoadInput = document.getElementById('node-has-own-load');
 const nodeLoadFields = document.getElementById('node-load-fields');
 const nodeNetworkTypeSelect = document.getElementById('node-network-type');
@@ -387,6 +407,21 @@ netZoomFitBtn.addEventListener('click', () => {
   networkTreeEl.style.transition = prevTransition;
 });
 
+// Корень всегда остаётся развёрнутым — «свернуть всё» иначе прятало бы
+// дерево целиком, оставляя на экране только карточку корня.
+function setAllNodesCollapsed(collapsed) {
+  const apply = (node, isRoot) => {
+    if (!isRoot && node.children.length) node.collapsed = collapsed;
+    node.children.forEach((child) => apply(child, false));
+  };
+  apply(networkTree, true);
+  persistNetworkScheme();
+  renderTree();
+}
+
+netExpandAllBtn.addEventListener('click', () => setAllNodesCollapsed(false));
+netCollapseAllBtn.addEventListener('click', () => setAllNodesCollapsed(true));
+
 // Колесо мыши с Ctrl/⌘ — зум к курсору (а не к центру дерева); также перехватывает
 // pinch-жест трекпада, который браузер сообщает как wheel-событие с ctrlKey=true.
 // Без модификатора preventDefault не вызывается — это оставляет обычную прокрутку
@@ -519,6 +554,7 @@ function createNode(overrides = {}) {
   return {
     id: crypto.randomUUID(),
     name: 'Новый узел',
+    comment: '',
     networkType: NETWORK_TYPES.AC1,
     voltage: 220,
     powerFactor: 1,
@@ -584,6 +620,7 @@ let lastCalcMap = null;
 let lastResultTree = null;
 let warningsByNode = new Map(); // nodeId -> массив замечаний для бейджа-точки на карточке
 let changedValueIds = new Set(); // узлы с изменившимся бейджем — для подсветки при пересчёте
+let nodeClipboard = null; // массив скопированных поддеревьев (Ctrl+C) для последующей вставки (Ctrl+V)
 let activeProjectId = null;
 let draggedNodeId = null;
 let searchQuery = '';
@@ -592,6 +629,7 @@ let searchPathIds = new Set();
 let addMenuParentId = null;
 let addMenuAnchor = null;
 let heatMapEnabled = false;
+let alwaysShowCurrent = false; // постоянный показ кружков с током на линиях, без наведения
 let treeZoom = 1;
 let activeWarningFilter = null; // category из collectSchemeWarnings, null — показывать все
 
@@ -738,16 +776,62 @@ function revealWarning(nodeId) {
   });
 }
 
+// --- Поиск по электрическим параметрам узла (помимо обычного поиска по имени) ---
+// Синтаксис: «<параметр><оператор><число>», например «i>16», «p<=5», «u=380»,
+// «сечение>4». Параметры, кроме напряжения (берётся прямо из настройки узла),
+// читаются из результата последнего расчёта сети — без расчёта они недоступны.
+const SEARCH_PARAM_GETTERS = {
+  i: (node, calc) => (calc && !calc.error ? calc.result.I : null),
+  ток: (node, calc) => (calc && !calc.error ? calc.result.I : null),
+  p: (node, calc) => (calc && !calc.error ? calc.result.P / 1000 : null),
+  мощность: (node, calc) => (calc && !calc.error ? calc.result.P / 1000 : null),
+  u: (node) => node.voltage ?? null,
+  напряжение: (node) => node.voltage ?? null,
+  b: (node, calc) => calc?.protection?.breaker ?? null,
+  автомат: (node, calc) => calc?.protection?.breaker ?? null,
+  s: (node, calc) => calc?.protection?.copperCable?.section ?? calc?.protection?.aluminumCable?.section ?? null,
+  сечение: (node, calc) => calc?.protection?.copperCable?.section ?? calc?.protection?.aluminumCable?.section ?? null,
+};
+const SEARCH_PARAMS_NEED_CALC = new Set(['i', 'ток', 'p', 'мощность', 'b', 'автомат', 's', 'сечение']);
+const SEARCH_PARAM_RE = /^(i|ток|p|мощность|u|напряжение|b|автомат|s|сечение)\s*(>=|<=|>|<|=)\s*(-?\d+(?:[.,]\d+)?)$/;
+const SEARCH_PARAM_CMP = {
+  '>': (a, b) => a > b,
+  '<': (a, b) => a < b,
+  '>=': (a, b) => a >= b,
+  '<=': (a, b) => a <= b,
+  '=': (a, b) => Math.abs(a - b) < 1e-6,
+};
+
+function parseParamQuery(query) {
+  const m = query.match(SEARCH_PARAM_RE);
+  if (!m) return null;
+  const [, param, op, numRaw] = m;
+  const num = Number(numRaw.replace(',', '.'));
+  if (Number.isNaN(num)) return null;
+  return { param, getter: SEARCH_PARAM_GETTERS[param], cmp: SEARCH_PARAM_CMP[op], num, needsCalc: SEARCH_PARAMS_NEED_CALC.has(param) };
+}
+
+function nodeMatchesQuery(node, query, paramSpec) {
+  if (paramSpec) {
+    const calc = lastCalcMap?.get(node.id);
+    const value = paramSpec.getter(node, calc);
+    return value != null && paramSpec.cmp(value, paramSpec.num);
+  }
+  return node.name.toLowerCase().includes(query);
+}
+
 /**
- * По поисковому запросу собирает множества id: matchIds — узлы, чьё название
- * содержит запрос; pathIds — сами совпадения и все их предки (путь от корня),
- * которые остаются яркими, тогда как остальные узлы притеняются.
+ * По поисковому запросу собирает множества id: matchIds — узлы, подходящие по
+ * имени либо по электрическому параметру (см. SEARCH_PARAM_RE выше); pathIds —
+ * сами совпадения и все их предки (путь от корня), которые остаются яркими,
+ * тогда как остальные узлы притеняются.
  */
 function computeSearchSets(query) {
   const matchIds = new Set();
   const pathIds = new Set();
+  const paramSpec = parseParamQuery(query);
   const walk = (node, ancestors) => {
-    if (node.name.toLowerCase().includes(query)) {
+    if (nodeMatchesQuery(node, query, paramSpec)) {
       matchIds.add(node.id);
       pathIds.add(node.id);
       ancestors.forEach((id) => pathIds.add(id));
@@ -761,8 +845,9 @@ function computeSearchSets(query) {
 /** Разворачивает свёрнутые ветви, в поддереве которых есть совпадение с запросом. Возвращает true, если что-то изменилось. */
 function ensureMatchesVisible(query) {
   let changed = false;
+  const paramSpec = parseParamQuery(query);
   const walk = (node) => {
-    const selfMatch = node.name.toLowerCase().includes(query);
+    const selfMatch = nodeMatchesQuery(node, query, paramSpec);
     let descendantMatch = false;
     node.children.forEach((child) => {
       if (walk(child)) descendantMatch = true;
@@ -846,9 +931,10 @@ function updateVersionControlsUI() {
   deleteVersionBtn.disabled = !selectedId;
 }
 
-const DIFF_FIELD_LABELS = { P: 'мощность P', I: 'ток I', breaker: 'автомат', error: 'расчёт' };
+const DIFF_FIELD_LABELS = { P: 'мощность P', I: 'ток I', breaker: 'автомат', cable: 'кабель', error: 'расчёт' };
 
 function formatDiffValue(key, value) {
+  if (key === 'cable') return value ? `${value.material} ${value.section} мм²` : '—';
   if (value == null) return '—';
   if (key === 'P') return formatPower(value);
   if (key === 'I') return formatCurrent(value);
@@ -988,10 +1074,32 @@ function collectErrors(calcNode, acc = []) {
   return acc;
 }
 
+/** Собирает имена всех узлов дерева (для проверки уникальности нового имени). */
+function collectAllNodeNames(node, acc = new Set()) {
+  acc.add(node.name);
+  node.children.forEach((child) => collectAllNodeNames(child, acc));
+  return acc;
+}
+
+/**
+ * Подбирает имя, уникальное в пределах дерева: если baseName уже занято,
+ * возвращает «baseName 2», «baseName 3» и т.д. Без этого узлы, добавленные
+ * пачкой (пустые или по одному шаблону), оставались одинаково подписанными
+ * («Новый узел», «Розеточная группа»...) и неразличимы в дереве.
+ */
+function uniqueNodeName(baseName) {
+  const existing = collectAllNodeNames(networkTree);
+  if (!existing.has(baseName)) return baseName;
+  let n = 2;
+  while (existing.has(`${baseName} ${n}`)) n += 1;
+  return `${baseName} ${n}`;
+}
+
 function addChildToNode(parentId, overrides = {}) {
   const parent = findNode(networkTree, parentId);
   if (!parent) return;
-  const child = createNode(overrides);
+  const baseName = overrides.name ?? 'Новый узел';
+  const child = createNode({ ...overrides, name: uniqueNodeName(baseName) });
   parent.children.push(child);
   selectedNodeId = child.id;
   selectedNodeIds = new Set([child.id]);
@@ -1082,21 +1190,34 @@ window.addEventListener('resize', () => {
 let contextMenuNodeId = null;
 let contextMenuPoint = null;
 
-function positionContextMenu(x, y) {
+// Меню открывается не точно в точке клика (та лежит на самой карточке, и
+// меню оказывалось бы поверх неё или соседних карточек), а рядом с карточкой
+// узла: по умолчанию справа от неё, с переключением на левую сторону, если
+// справа не хватает места, и с вертикальным клампом по границам карточки и экрана.
+function positionContextMenu(x, y, cardRect) {
   const menuRect = nodeContextMenu.getBoundingClientRect();
-  let left = x;
-  let top = y;
+  const gap = 6;
+  let left = cardRect ? cardRect.right + gap : x;
+  let top = cardRect ? Math.min(y, cardRect.bottom - menuRect.height) : y;
+  if (cardRect && left + menuRect.width > window.innerWidth - 8) {
+    left = cardRect.left - menuRect.width - gap;
+  }
   if (left + menuRect.width > window.innerWidth - 8) left = window.innerWidth - menuRect.width - 8;
   if (top + menuRect.height > window.innerHeight - 8) top = window.innerHeight - menuRect.height - 8;
   nodeContextMenu.style.left = `${Math.max(8, left)}px`;
   nodeContextMenu.style.top = `${Math.max(8, top)}px`;
 }
 
-function openContextMenu(nodeId, x, y) {
+function openContextMenu(nodeId, x, y, cardRect) {
+  const isRoot = nodeId === networkTree.id;
   contextMenuNodeId = nodeId;
-  contextMenuPoint = { x, y };
+  contextMenuPoint = { x, y, cardRect };
+  contextCopyBtn.disabled = isRoot;
+  contextPasteBtn.disabled = !nodeClipboard || !nodeClipboard.length;
+  contextDuplicateBtn.disabled = isRoot;
+  contextDeleteBtn.disabled = isRoot;
   nodeContextMenu.hidden = false;
-  positionContextMenu(x, y);
+  positionContextMenu(x, y, cardRect);
 }
 
 function closeContextMenu() {
@@ -1104,6 +1225,18 @@ function closeContextMenu() {
   contextMenuNodeId = null;
   contextMenuPoint = null;
 }
+
+contextCopyBtn.addEventListener('click', () => {
+  const id = contextMenuNodeId;
+  closeContextMenu();
+  if (id) copyNodeToClipboard(findNode(networkTree, id));
+});
+
+contextPasteBtn.addEventListener('click', () => {
+  const id = contextMenuNodeId;
+  closeContextMenu();
+  if (id) pasteClipboardInto(id);
+});
 
 contextDuplicateBtn.addEventListener('click', () => {
   const id = contextMenuNodeId;
@@ -1130,10 +1263,10 @@ document.addEventListener('keydown', (event) => {
 // пересчитываем позицию у той же точки — иначе случайный скролл, вызванный
 // тем же действием, что открыло меню, закрывал бы его сразу после открытия.
 window.addEventListener('scroll', () => {
-  if (!nodeContextMenu.hidden && contextMenuPoint) positionContextMenu(contextMenuPoint.x, contextMenuPoint.y);
+  if (!nodeContextMenu.hidden && contextMenuPoint) positionContextMenu(contextMenuPoint.x, contextMenuPoint.y, contextMenuPoint.cardRect);
 }, true);
 window.addEventListener('resize', () => {
-  if (!nodeContextMenu.hidden && contextMenuPoint) positionContextMenu(contextMenuPoint.x, contextMenuPoint.y);
+  if (!nodeContextMenu.hidden && contextMenuPoint) positionContextMenu(contextMenuPoint.x, contextMenuPoint.y, contextMenuPoint.cardRect);
 });
 
 function deleteNode(id) {
@@ -1241,6 +1374,38 @@ function duplicateSelected() {
     selectedNodeIds = newIds;
     selectedNodeId = [...newIds][0];
   }
+  persistNetworkScheme();
+  renderTree();
+  renderPanel();
+}
+
+/** Копирует поддерево узла (или все выбранные узлы, если копируемый узел входит в группу) в буфер. */
+function copyNodeToClipboard(node) {
+  if (node.id === networkTree.id) return;
+  const ids = effectiveSelectedIds();
+  const sourceIds = ids.includes(node.id) ? ids : [node.id];
+  nodeClipboard = sourceIds
+    .map((sid) => findNode(networkTree, sid))
+    .filter(Boolean)
+    .map((n) => cloneNodeDeepInner(n));
+}
+
+/** Вставляет ранее скопированные поддеревья как дочерние узлы targetId; каждая вставка — свежие id и уникальные имена. */
+function pasteClipboardInto(targetId) {
+  if (!nodeClipboard || !nodeClipboard.length) return;
+  const target = findNode(networkTree, targetId);
+  if (!target) return;
+  pushUndo();
+  const newIds = new Set();
+  nodeClipboard.forEach((entry) => {
+    const clone = cloneNodeDeepInner(entry);
+    clone.name = uniqueNodeName(clone.name);
+    target.children.push(clone);
+    newIds.add(clone.id);
+  });
+  target.collapsed = false;
+  selectedNodeIds = newIds;
+  selectedNodeId = [...newIds][0];
   persistNetworkScheme();
   renderTree();
   renderPanel();
@@ -1370,25 +1535,29 @@ function renderNodeEl(node, level = 1) {
       draggedNodeId = null;
       card.classList.remove('dragging');
     });
-
-    card.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      openContextMenu(node.id, event.clientX, event.clientY);
-    });
-
-    let longPressTimer = null;
-    card.addEventListener('touchstart', (event) => {
-      if (event.touches.length !== 1) return;
-      const { clientX, clientY } = event.touches[0];
-      longPressTimer = setTimeout(() => {
-        longPressTimer = null;
-        openContextMenu(node.id, clientX, clientY);
-      }, 550);
-    });
-    card.addEventListener('touchend', () => clearTimeout(longPressTimer));
-    card.addEventListener('touchmove', () => clearTimeout(longPressTimer));
   }
+
+  // Контекстное меню (и долгое нажатие на сенсорных экранах) открывается и на
+  // корневом узле — туда нельзя дублировать/удалять/копировать, но в него
+  // можно вставить ранее скопированное поддерево; openContextMenu сама
+  // расставляет .disabled на неприменимых для корня пунктах.
+  card.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    openContextMenu(node.id, event.clientX, event.clientY, card.getBoundingClientRect());
+  });
+
+  let longPressTimer = null;
+  card.addEventListener('touchstart', (event) => {
+    if (event.touches.length !== 1) return;
+    const { clientX, clientY } = event.touches[0];
+    longPressTimer = setTimeout(() => {
+      longPressTimer = null;
+      openContextMenu(node.id, clientX, clientY, card.getBoundingClientRect());
+    }, 550);
+  });
+  card.addEventListener('touchend', () => clearTimeout(longPressTimer));
+  card.addEventListener('touchmove', () => clearTimeout(longPressTimer));
 
   card.addEventListener('dragover', (event) => {
     if (!draggedNodeId || draggedNodeId === node.id) return;
@@ -1477,7 +1646,7 @@ function renderNodeEl(node, level = 1) {
   const name = document.createElement('span');
   name.className = 'net-node-name';
   name.textContent = node.name;
-  name.title = 'Двойной клик — переименовать';
+  name.title = `${node.name} — двойной клик для переименования`;
   name.addEventListener('dblclick', (event) => {
     event.stopPropagation();
     startRenameNode(node, name);
@@ -1488,6 +1657,15 @@ function renderNodeEl(node, level = 1) {
   meta.textContent = nodeMeta(node);
 
   card.append(header, tag, name, meta);
+
+  if (node.comment && node.comment.trim()) {
+    const commentDot = document.createElement('span');
+    commentDot.className = 'net-node-comment-dot';
+    commentDot.textContent = '💬';
+    commentDot.title = node.comment;
+    commentDot.setAttribute('aria-label', `Примечание: ${node.comment}`);
+    card.appendChild(commentDot);
+  }
 
   if (calc) {
     const badge = document.createElement('span');
@@ -1566,9 +1744,16 @@ function renderTree() {
     searchMatchIds = matchIds;
     searchPathIds = pathIds;
     networkTreeEl.classList.add('is-searching');
-    networkSearchStatus.textContent = matchIds.size
-      ? `Найдено узлов: ${matchIds.size}.`
-      : 'Узлы с таким названием не найдены.';
+    const paramSpec = parseParamQuery(searchQuery);
+    if (matchIds.size) {
+      networkSearchStatus.textContent = `Найдено узлов: ${matchIds.size}.`;
+    } else if (paramSpec && paramSpec.needsCalc && !lastCalcMap) {
+      networkSearchStatus.textContent = 'Сначала рассчитайте сеть — поиск по этому параметру использует результаты расчёта.';
+    } else if (paramSpec) {
+      networkSearchStatus.textContent = 'Узлы с таким значением параметра не найдены.';
+    } else {
+      networkSearchStatus.textContent = 'Узлы с таким названием не найдены.';
+    }
   } else {
     networkTreeEl.classList.remove('is-searching');
     networkSearchStatus.textContent = '';
@@ -1595,8 +1780,10 @@ function renderMultiActions() {
     // Если в выборе остались только корень/вложенные — групповые операции недоступны.
     multiDuplicateBtn.disabled = count === 0;
     multiDeleteBtn.disabled = count === 0;
+    multiBulkEditBtn.disabled = count === 0;
   } else {
     netMultiActions.hidden = true;
+    closeBulkEditPanel();
   }
 }
 
@@ -1608,7 +1795,24 @@ function renderMultiActions() {
  */
 function renderWarnings() {
   // Пустое состояние видно, пока сеть не рассчитана, и зовёт нажать «Рассчитать».
-  if (netEmptyState) netEmptyState.hidden = Boolean(lastResultTree);
+  // Текст отличается для действительно пустого дерева (только корень, без
+  // потребителей) и для уже собранного, но ещё не рассчитанного — иначе
+  // подсказка «соберите дерево» выглядела бы неверной над уже непустым деревом.
+  if (netEmptyState) {
+    const showEmpty = !lastResultTree;
+    netEmptyState.hidden = !showEmpty;
+    if (showEmpty) {
+      const isTrivial = networkTree.children.length === 0;
+      if (netEmptyTitle) {
+        netEmptyTitle.textContent = isTrivial ? 'Сеть пока пуста' : 'Сеть ещё не рассчитана';
+      }
+      if (netEmptyText) {
+        netEmptyText.textContent = isTrivial
+          ? 'Добавьте узлы дерева (щиты, группы, потребители) и нажмите «Рассчитать сеть» — подберём автоматы и кабели для всех линий и проверим схему: токи, потерю напряжения, баланс и селективность.'
+          : 'Дерево узлов уже собрано — отредактируйте его при необходимости и нажмите «Рассчитать сеть»: подберём автоматы и кабели для всех линий и проверим схему: токи, потерю напряжения, баланс и селективность.';
+      }
+    }
+  }
   if (!lastResultTree) {
     networkWarnings.hidden = true;
     return;
@@ -1711,22 +1915,34 @@ function renderBom() {
     return;
   }
 
-  const addSection = (title, rows, renderRow) => {
+  const addSection = (title, columns, rows, renderRow) => {
     if (!rows.length) return;
-    const heading = document.createElement('p');
-    heading.className = 'net-bom-group-title';
-    heading.textContent = title;
-    netBomBody.appendChild(heading);
-
     const table = document.createElement('table');
     table.className = 'net-bom-table';
+
+    const caption = document.createElement('caption');
+    caption.className = 'net-bom-group-title';
+    caption.textContent = title;
+    table.appendChild(caption);
+
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    columns.forEach((col) => {
+      const th = document.createElement('th');
+      th.scope = 'col';
+      th.textContent = col;
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
     const tbody = document.createElement('tbody');
     rows.forEach((row) => tbody.appendChild(renderRow(row)));
     table.appendChild(tbody);
     netBomBody.appendChild(table);
   };
 
-  addSection('Автоматические выключатели', bom.breakers, (b) => {
+  addSection('Автоматические выключатели', ['Наименование', 'Количество'], bom.breakers, (b) => {
     const tr = document.createElement('tr');
     const nameTd = document.createElement('td');
     nameTd.textContent = breakerSpecLabel(b);
@@ -1737,7 +1953,7 @@ function renderBom() {
     return tr;
   });
 
-  addSection('Кабели', bom.cables, (c) => {
+  addSection('Кабели', ['Наименование', 'Длина'], bom.cables, (c) => {
     const tr = document.createElement('tr');
     const nameTd = document.createElement('td');
     nameTd.textContent = cableSpecLabel(c);
@@ -2002,10 +2218,8 @@ function loadColorRgb(t) {
 heatmapLegendBar.style.background =
   `linear-gradient(to right, ${LOAD_COLOR_STOPS.map((c, i) => `rgb(${c[0]}, ${c[1]}, ${c[2]}) ${(i / (LOAD_COLOR_STOPS.length - 1)) * 100}%`).join(', ')})`;
 
-/** Показывает легенду тепловой карты с фактическим диапазоном токов дерева. */
-function updateHeatMapLegend(range) {
-  heatmapLegendMin.textContent = formatCurrent(range.min);
-  heatmapLegendMax.textContent = range.max > range.min ? formatCurrent(range.max) : '';
+/** Показывает легенду тепловой карты (шкала фиксированная — доля номинала автомата). */
+function updateHeatMapLegend() {
   heatmapLegend.hidden = false;
 }
 
@@ -2013,32 +2227,36 @@ function hideHeatMapLegend() {
   heatmapLegend.hidden = true;
 }
 
-/** Диапазон расчётных токов по всем рассчитанным узлам — основа для нормировки нагрузки. */
-function currentRange() {
-  if (!lastCalcMap) return null;
-  let min = Infinity;
-  let max = -Infinity;
+/** Есть ли хотя бы один рассчитанный узел с подобранным автоматом — иначе нечем раскрашивать. */
+function hasColorableLoad() {
+  if (!lastCalcMap) return false;
   for (const calc of lastCalcMap.values()) {
-    if (calc.error || !calc.result) continue;
-    const { I } = calc.result;
-    if (I < min) min = I;
-    if (I > max) max = I;
+    if (!calc.error && calc.result && calc.protection?.breaker) return true;
   }
-  return min === Infinity ? null : { min, max };
+  return false;
 }
 
-/** Нормирует ток в [0,1] относительно диапазона; при равных значениях — середина шкалы. */
-function normLoad(value, range) {
-  if (!range || range.max <= range.min) return 0.5;
-  return (value - range.min) / (range.max - range.min);
-}
-
-/** Цвет нагрузки узла/линии по его расчётному току (null — если ток не рассчитан). */
-function nodeLoadColor(id, range) {
-  if (!range) return null;
+/**
+ * Доля тока узла от номинала его автомата — абсолютная нормировка нагрузки.
+ * Раньше цвет нормировался относительно мин/макс тока по всему дереву, из-за
+ * чего ветка, загруженная на 76% своего автомата, могла выглядеть «холодной»
+ * только потому, что другая ветка дерева несёт больший абсолютный ток. Теперь
+ * шкала привязана к номиналу автомата каждого узла и не зависит от остального
+ * дерева. null — нет расчёта либо автомат не подобран (нечем нормировать).
+ */
+function nodeLoadFraction(id) {
   const calc = lastCalcMap?.get(id);
   if (!calc || calc.error || !calc.result) return null;
-  const [r, g, b] = loadColorRgb(normLoad(calc.result.I, range));
+  const breaker = calc.protection?.breaker;
+  if (!breaker) return null;
+  return calc.result.I / breaker;
+}
+
+/** Цвет нагрузки узла/линии по доле тока от номинала автомата (null — если не определена). */
+function nodeLoadColor(id) {
+  const t = nodeLoadFraction(id);
+  if (t == null) return null;
+  const [r, g, b] = loadColorRgb(t);
   return { solid: `rgb(${r}, ${g}, ${b})`, r, g, b };
 }
 
@@ -2055,14 +2273,13 @@ function nodeLoadColor(id, range) {
 function highlightHoverPath(id) {
   clearHoverInlineStyles();
   const chain = id === networkTree.id ? collectDescendantIds(networkTree) : getAncestorChainIds(id);
-  const range = currentRange();
   networkTreeEl.classList.add('is-hovering');
 
   networkTreeEl.querySelectorAll('.net-node-wrap').forEach((wrap) => {
     const on = chain.has(wrap.dataset.id);
     wrap.classList.toggle('on-hover-path', on);
     const card = wrap.querySelector('.net-node');
-    const color = on ? nodeLoadColor(wrap.dataset.id, range) : null;
+    const color = on ? nodeLoadColor(wrap.dataset.id) : null;
     if (card && color) {
       card.style.borderColor = color.solid;
       card.style.boxShadow = `0 0 0 1px ${color.solid}, 0 0 10px 2px rgba(${color.r}, ${color.g}, ${color.b}, 0.55), 0 0 26px 6px rgba(${color.r}, ${color.g}, ${color.b}, 0.3)`;
@@ -2072,7 +2289,7 @@ function highlightHoverPath(id) {
   networkTreeEl.querySelectorAll('.net-connector').forEach((path) => {
     const on = chain.has(path.dataset.child);
     path.classList.toggle('on-hover-path', on);
-    const color = on ? nodeLoadColor(path.dataset.child, range) : null;
+    const color = on ? nodeLoadColor(path.dataset.child) : null;
     if (color) {
       path.style.stroke = color.solid;
       path.style.filter = `drop-shadow(0 0 3px rgba(${color.r}, ${color.g}, ${color.b}, 0.9)) drop-shadow(0 0 10px rgba(${color.r}, ${color.g}, ${color.b}, 0.55))`;
@@ -2082,7 +2299,7 @@ function highlightHoverPath(id) {
   networkTreeEl.querySelectorAll('.net-connector-current').forEach((group) => {
     const on = chain.has(group.dataset.child);
     group.classList.toggle('on-hover-path', on);
-    const color = on ? nodeLoadColor(group.dataset.child, range) : null;
+    const color = on ? nodeLoadColor(group.dataset.child) : null;
     if (color) {
       const circle = group.querySelector('circle');
       const text = group.querySelector('text');
@@ -2130,16 +2347,15 @@ function renderHeatMap() {
     hideHeatMapLegend();
     return;
   }
-  const range = currentRange();
-  if (!range) {
+  if (!hasColorableLoad()) {
     hideHeatMapLegend();
     return;
   }
-  updateHeatMapLegend(range);
+  updateHeatMapLegend();
 
   networkTreeEl.querySelectorAll('.net-node-wrap').forEach((wrap) => {
     const card = wrap.querySelector('.net-node');
-    const color = nodeLoadColor(wrap.dataset.id, range);
+    const color = nodeLoadColor(wrap.dataset.id);
     if (card && color) {
       // Выбранный узел: инлайн-цвет нагрузки перекрыл бы рамку выделения из CSS,
       // а тёплый цвет шкалы совпадает с акцентным — выделение стало бы незаметным.
@@ -2154,12 +2370,12 @@ function renderHeatMap() {
   });
 
   networkTreeEl.querySelectorAll('.net-connector').forEach((path) => {
-    const color = nodeLoadColor(path.dataset.child, range);
+    const color = nodeLoadColor(path.dataset.child);
     if (color) path.style.stroke = color.solid;
   });
 
   networkTreeEl.querySelectorAll('.net-connector-current').forEach((group) => {
-    const color = nodeLoadColor(group.dataset.child, range);
+    const color = nodeLoadColor(group.dataset.child);
     if (color) {
       const circle = group.querySelector('circle');
       const text = group.querySelector('text');
@@ -2571,6 +2787,7 @@ function renderPanel() {
   netPanelTitle.textContent = node.name;
   renderBreadcrumb(node);
   nodeNameInput.value = node.name;
+  nodeCommentInput.value = node.comment || '';
   nodeHasOwnLoadInput.checked = node.hasOwnLoad;
   nodeNetworkTypeSelect.value = node.networkType;
   nodeVoltageInput.value = node.voltage;
@@ -2697,6 +2914,7 @@ function onPanelChange() {
   const node = findNode(networkTree, selectedNodeId);
   if (!node) return;
   node.name = nodeNameInput.value || 'Узел';
+  node.comment = nodeCommentInput.value;
   node.hasOwnLoad = nodeHasOwnLoadInput.checked;
   node.networkType = nodeNetworkTypeSelect.value;
   node.voltage = Number(nodeVoltageInput.value);
@@ -2744,7 +2962,7 @@ nodeNetworkTypeSelect.addEventListener('change', () => {
 });
 
 [
-  nodeNameInput, nodeHasOwnLoadInput, nodeVoltageInput, nodePfInput, nodeLoadModeGroupInput,
+  nodeNameInput, nodeCommentInput, nodeHasOwnLoadInput, nodeVoltageInput, nodePfInput, nodeLoadModeGroupInput,
   nodePowerValueInput, nodePowerUnitSelect, nodeCurrentValueInput, nodeInstallationSelect,
   nodeCableCountInput, nodeAmbientTempInput, nodeInsulationSelect, nodeCableLengthInput, nodeKcInput,
   nodeTargetPfInput, nodePhaseL1Input, nodePhaseL2Input, nodePhaseL3Input,
@@ -2831,11 +3049,77 @@ heatmapToggleBtn.addEventListener('click', () => {
   }
 });
 
+currentToggleBtn.addEventListener('click', () => {
+  alwaysShowCurrent = !alwaysShowCurrent;
+  currentToggleBtn.setAttribute('aria-pressed', String(alwaysShowCurrent));
+  currentToggleBtn.classList.toggle('is-active', alwaysShowCurrent);
+  networkTreeEl.classList.toggle('is-current-always', alwaysShowCurrent);
+});
+
 multiDuplicateBtn.addEventListener('click', duplicateSelected);
 multiDeleteBtn.addEventListener('click', deleteSelected);
 multiClearBtn.addEventListener('click', () => {
   selectedNodeIds = new Set([selectedNodeId]);
   renderTree();
+});
+
+// --- Групповое редактирование общих полей у выбранных узлов -----------------
+const BULK_EDIT_FIELDS = [
+  { checkbox: bulkApplyInstallation, input: bulkInstallation, prop: 'installationMethod', parse: (raw) => raw },
+  { checkbox: bulkApplyInsulation, input: bulkInsulation, prop: 'insulation', parse: (raw) => raw },
+  { checkbox: bulkApplyAmbient, input: bulkAmbient, prop: 'ambientTemp', parse: (raw) => Number(raw) },
+  { checkbox: bulkApplyPf, input: bulkPf, prop: 'powerFactor', parse: (raw) => Number(raw) },
+];
+
+BULK_EDIT_FIELDS.forEach(({ checkbox, input }) => {
+  checkbox.addEventListener('change', () => {
+    input.disabled = !checkbox.checked;
+  });
+});
+
+function closeBulkEditPanel() {
+  netBulkEditPanel.hidden = true;
+  multiBulkEditBtn.setAttribute('aria-expanded', 'false');
+  BULK_EDIT_FIELDS.forEach(({ checkbox, input }) => {
+    checkbox.checked = false;
+    input.disabled = true;
+  });
+}
+
+multiBulkEditBtn.addEventListener('click', () => {
+  const willOpen = netBulkEditPanel.hidden;
+  if (willOpen) {
+    netBulkEditPanel.hidden = false;
+    multiBulkEditBtn.setAttribute('aria-expanded', 'true');
+  } else {
+    closeBulkEditPanel();
+  }
+});
+
+bulkEditCancelBtn.addEventListener('click', closeBulkEditPanel);
+
+bulkEditApplyBtn.addEventListener('click', () => {
+  const ids = effectiveSelectedIds();
+  if (!ids.length) return;
+  const active = BULK_EDIT_FIELDS.filter(({ checkbox, input }) => checkbox.checked && input.value !== '');
+  if (!active.length) {
+    closeBulkEditPanel();
+    return;
+  }
+  pushUndo();
+  ids.forEach((id) => {
+    const node = findNode(networkTree, id);
+    if (!node) return;
+    active.forEach(({ prop, input, parse }) => {
+      const value = parse(input.value);
+      if (typeof value === 'number' && Number.isNaN(value)) return;
+      node[prop] = value;
+    });
+  });
+  persistNetworkScheme();
+  renderTree();
+  renderPanel();
+  closeBulkEditPanel();
 });
 
 // Клавиатурные сокращения на активной вкладке конструктора (и только вне полей
@@ -2869,6 +3153,19 @@ document.addEventListener('keydown', (event) => {
     } else if (hasSelectedChild) {
       event.preventDefault();
       deleteNode(selectedNodeId);
+    }
+    // event.code — физическая клавиша, а не event.key — чтобы Ctrl+C/Ctrl+V
+    // работали независимо от раскладки клавиатуры (на кириллической раскладке
+    // event.key для этих клавиш — «с»/«м», а не «c»/«v»).
+  } else if (ctrl && event.code === 'KeyC') {
+    if (hasSelectedChild) {
+      event.preventDefault();
+      copyNodeToClipboard(findNode(networkTree, selectedNodeId));
+    }
+  } else if (ctrl && event.code === 'KeyV') {
+    if (nodeClipboard && nodeClipboard.length) {
+      event.preventDefault();
+      pasteClipboardInto(selectedNodeId || networkTree.id);
     }
   }
 });

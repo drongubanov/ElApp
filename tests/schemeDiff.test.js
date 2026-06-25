@@ -78,6 +78,18 @@ test('diffSchemes: изменение нагрузки отражается в P
   assert.equal(pField.to, 5000);
 });
 
+test('diffSchemes: рост нагрузки отражается в выборе сечения/материала кабеля', () => {
+  const a = tree([load('a', 1000)]);
+  const b = tree([load('a', 5000)]);
+  const diff = diffSchemes(a, b);
+  const changedA = diff.changed.find((c) => c.id === 'a');
+  const cableField = changedA.fields.find((f) => f.key === 'cable');
+  assert.ok(cableField, 'должно появиться изменение по кабелю');
+  assert.equal(cableField.from.section, 1.5);
+  assert.equal(cableField.to.section, 2.5);
+  assert.equal(cableField.from.material, 'медь');
+});
+
 test('diffSchemes: появление ошибки расчёта фиксируется как изменение', () => {
   const a = tree([load('a', 1000)]);
   const b = tree([load('a', 1000, { voltage: 0 })]); // делает узел нерасчитываемым

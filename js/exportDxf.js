@@ -15,6 +15,16 @@ function num(value) {
   return Number(value).toFixed(3);
 }
 
+// Допустимые значения толщины линии в DXF (группа 370), сотые доли мм —
+// выбираем ближайшее стандартное, чтобы AutoCAD и совместимые программы
+// отрисовали линию её фактическим весом, а не одной толщиной для всех.
+const LINEWEIGHTS = [0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53, 60, 70, 80, 90, 100, 106, 120, 140, 158, 200, 211];
+
+function lineWeightCode(weightMm) {
+  const target = Math.round(Number(weightMm) * 100);
+  return LINEWEIGHTS.reduce((best, v) => (Math.abs(v - target) < Math.abs(best - target) ? v : best), LINEWEIGHTS[0]);
+}
+
 // Кодирование не-ASCII символов для DXF/AutoCAD (\U+XXXX).
 function encodeText(value) {
   let out = '';
@@ -69,6 +79,7 @@ export function buildDxf(sheet) {
   sheet.segments.forEach((s) => {
     pair(0, 'LINE');
     pair(8, s.layer);
+    pair(370, lineWeightCode(s.weight));
     pair(10, num(s.x1));
     pair(20, num(fy(s.y1)));
     pair(11, num(s.x2));

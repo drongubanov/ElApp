@@ -133,7 +133,8 @@ main {
 }
 
 select,
-input[type='number'] {
+input[type='number'],
+textarea {
   width: 100%;
   padding: 10px 12px;
   border-radius: var(--radius);
@@ -143,8 +144,14 @@ input[type='number'] {
   font-size: 1rem;
 }
 
+textarea {
+  font-family: inherit;
+  resize: vertical;
+}
+
 select:focus,
-input:focus {
+input:focus,
+textarea:focus {
   outline: 2px solid var(--color-accent);
 }
 
@@ -830,9 +837,20 @@ input:focus {
   min-width: 0;
 }
 
-.net-actions > .btn-danger {
+/* Деструктивное действие — на отдельной строке тулбара (flex: 1 1 100% всегда
+   переносит его вниз, как и первичную кнопку «Рассчитать»), отделено отступом
+   и пунктирной чертой, чтобы не оказаться рядом с часто нажимаемыми кнопками. */
+.net-actions-danger-row {
+  flex: 1 1 100%;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--color-border);
+}
+
+.net-actions-danger-row > .btn-danger {
   flex: 0 1 200px;
-  margin-left: auto;
 }
 
 .net-actions .btn-secondary,
@@ -901,7 +919,26 @@ input:focus {
   display: none;
 }
 
-.net-export-dropdown > button {
+/* Пункты сгруппированы по смыслу — «Схема» (PDF/DXF чертежей) и «Ведомость»
+   (CSV/PDF спецификаций) — раньше это был один плоский список вперемешку. */
+.net-export-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.net-export-group + .net-export-group {
+  border-top: 1px solid var(--color-border);
+}
+
+.net-export-group-title {
+  margin: 8px 14px 2px;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.net-export-group > button {
   display: block;
   width: 100%;
   padding: 11px 14px;
@@ -915,15 +952,20 @@ input:focus {
   cursor: pointer;
 }
 
-.net-export-dropdown > button:last-child {
+.net-export-group > button:last-child {
   border-bottom: none;
 }
 
-.net-export-dropdown > button:hover,
-.net-export-dropdown > button:focus-visible {
+.net-export-group > button:hover {
   background: var(--color-surface-alt);
   color: var(--color-accent);
-  outline: none;
+}
+
+.net-export-group > button:focus-visible {
+  background: var(--color-surface-alt);
+  color: var(--color-accent);
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
 }
 
 /* Кнопки экспорта схем подсвечиваются зелёным при наведении. */
@@ -1106,6 +1148,8 @@ input:focus {
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  text-align: left;
+  caption-side: top;
 }
 
 .net-bom-table {
@@ -1215,6 +1259,62 @@ input:focus {
   width: auto;
   padding: var(--space-2) var(--space-3);
   font-size: 0.9rem;
+}
+
+/* --- Групповое редактирование общих полей выбранных узлов ------------------ */
+.net-bulk-edit-panel[hidden] {
+  display: none;
+}
+
+.net-bulk-edit-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: 12px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius);
+}
+
+.net-bulk-edit-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.net-bulk-edit-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.net-bulk-edit-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 220px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.net-bulk-edit-row select,
+.net-bulk-edit-row input {
+  flex: 1 1 220px;
+  margin: 0;
+}
+
+.net-bulk-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.net-bulk-edit-actions > button {
+  width: auto;
+  padding: var(--space-2) var(--space-4);
 }
 
 /* --- Поиск по дереву ------------------------------------------------------ */
@@ -1337,6 +1437,21 @@ input:focus {
 .net-add-menu > button:hover,
 .net-add-menu > button:focus-visible {
   background: var(--color-surface-alt);
+}
+
+.net-add-menu > button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.net-add-menu > button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.net-add-menu > button:disabled:hover,
+.net-add-menu > button:disabled:focus-visible {
+  background: transparent;
   outline: none;
 }
 
@@ -1427,6 +1542,13 @@ input:focus {
   font-variant-numeric: tabular-nums;
 }
 
+.net-zoom-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--color-border);
+  margin: 0 2px;
+}
+
 /* Подсказка про pan/зум при первом заходе. position: sticky (как у
    .net-zoom-controls) держит её у левого края видимой области, даже когда
    дерево шире wrapper'а и прокручено вбок. Лежит в потоке под кнопками зума,
@@ -1486,9 +1608,12 @@ input:focus {
   cursor: pointer;
 }
 
-.net-canvas-hint-close:hover {
+.net-canvas-hint-close:hover,
+.net-canvas-hint-close:focus-visible {
   border-color: var(--color-accent);
   color: var(--color-accent);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }
 
 /* Индикатор «вы здесь» — показывает, какая часть широкого дерева видна
@@ -1496,10 +1621,10 @@ input:focus {
    .net-tree-wrapper, поэтому сам не скроллится и всегда на виду. */
 .net-minimap {
   position: relative;
-  height: 4px;
-  margin: 2px 0 4px;
+  height: 8px;
+  margin: 4px 0;
   background: var(--color-surface-alt);
-  border-radius: 2px;
+  border-radius: 4px;
   overflow: hidden;
 }
 
@@ -1548,12 +1673,15 @@ input:focus {
 }
 
 /* При наведении на узел подсвечивается путь к корню (узлы + линии),
-   остальное затухает — чтобы было видно цепочку питания. */
+   остальное затухает — чтобы было видно цепочку питания. Узлы группового
+   выбора (multi-selected) исключены из затухания: иначе наведение на
+   узел вне группы визуально «гасило» выбранные пользователем карточки. */
 .net-tree.is-hovering .net-node-wrap {
   opacity: 0.3;
 }
 
-.net-tree.is-hovering .net-node-wrap.on-hover-path {
+.net-tree.is-hovering .net-node-wrap.on-hover-path,
+.net-tree.is-hovering .net-node-wrap:has(.net-node.multi-selected) {
   opacity: 1;
 }
 
@@ -1598,6 +1726,12 @@ input:focus {
 }
 
 .net-tree.is-hovering .net-connector-current.on-hover-path {
+  opacity: 1;
+}
+
+/* Кнопка «Показывать токи» — держит кружки тока видимыми на всех линиях
+   постоянно, а не только на участке под курсором. */
+.net-tree.is-current-always .net-connector-current {
   opacity: 1;
 }
 
@@ -1665,6 +1799,23 @@ input:focus {
 
 .net-node-check-dot[data-severity='error'] {
   background: var(--color-danger);
+}
+
+.net-node-comment-dot {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-surface);
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+  font-size: 0.6rem;
+  line-height: 1;
 }
 
 .net-node-check-dot:hover,
@@ -1782,8 +1933,8 @@ input:focus {
 }
 
 .net-node-icon-btn {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -1792,7 +1943,7 @@ input:focus {
   border: 1px solid var(--color-border);
   background: var(--color-surface-alt);
   color: var(--color-text-muted);
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   line-height: 1;
   cursor: pointer;
 }
@@ -1808,6 +1959,10 @@ input:focus {
 }
 
 .net-node-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   font-weight: 600;
   font-size: 0.95rem;
   word-break: break-word;
@@ -1923,9 +2078,12 @@ input:focus {
   cursor: pointer;
 }
 
-.net-panel-collapse-btn:hover {
+.net-panel-collapse-btn:hover,
+.net-panel-collapse-btn:focus-visible {
   border-color: var(--color-accent);
   color: var(--color-accent);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }
 
 .net-panel-header h3 {
@@ -2150,10 +2308,13 @@ input:focus {
 
   /* Кнопки действий сети — ровно по две в ряд (вместо «резинового» переноса),
      с читаемыми подписями и достаточной высотой касания. */
-  .net-actions > .btn-primary,
-  .net-actions > .btn-secondary,
-  .net-actions > .net-export-menu {
-    flex: 1 1 calc(50% - 5px);
+  .net-actions-group > .btn-secondary,
+  .net-actions-group > .net-export-menu {
+    flex: 1 1 calc(50% - 4px);
+  }
+
+  .net-actions-danger-row > .btn-danger {
+    flex: 1 1 100%;
   }
 
   /* Поля и кнопки управления проектами растягиваются на всю ширину строки —
@@ -2167,6 +2328,28 @@ input:focus {
   .net-panel select,
   .net-panel input[type='number'] {
     max-width: none;
+  }
+}
+
+/* Планшетный диапазон (768–1024px типичен для планшетов в портретной и части
+   ландшафтной ориентации). В отличие от телефонного брейкпоинта выше, здесь
+   не нужно ужимать шрифты/поля в одну колонку — места достаточно, но это
+   преимущественно тач-устройства, а не десктоп с мышью, поэтому увеличиваем
+   зоны нажатия у часто используемых элементов управления деревом. */
+@media (min-width: 601px) and (max-width: 1024px) {
+  .net-zoom-btn {
+    width: 34px;
+    height: 32px;
+  }
+
+  .net-node-icon-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .net-actions-group > .btn-secondary,
+  .net-actions-group > .net-export-menu {
+    flex: 1 1 calc(50% - 4px);
   }
 }
 
