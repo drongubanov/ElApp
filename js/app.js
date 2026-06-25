@@ -666,6 +666,9 @@ let draggedNodeId = null;
 let searchQuery = '';
 let searchMatchIds = new Set();
 let searchPathIds = new Set();
+// Наложение результатов сравнения версий прямо на дерево: nodeId → 'added' |
+// 'changed'. Удалённых узлов в текущем дереве нет, поэтому они только в списке.
+let diffOverlay = null;
 let addMenuParentId = null;
 let addMenuAnchor = null;
 let heatMapEnabled = false;
@@ -913,6 +916,10 @@ function clearSearch() {
 
 function persistNetworkScheme() {
   if (networkTree) saveNetworkScheme({ tree: networkTree, activeProjectId });
+  // Любое изменение данных дерева (добавление/удаление/перенос/правка полей и
+  // имени) делает подсветку сравнения версий устаревшей — снимаем её. Перерисовку
+  // выполняет сам инициатор изменения сразу после persist.
+  diffOverlay = null;
 }
 
 function renderProjectList() {
@@ -983,28 +990,72 @@ function formatDiffValue(key, value) {
   return String(value);
 }
 
+// Снимает подсветку сравнения с дерева. Вызывается при любой правке дерева
+// (через pushUndo), повторном сравнении и по кнопке «Скрыть подсветку».
+function clearDiffOverlay({ rerender = false } = {}) {
+  if (!diffOverlay) return;
+  diffOverlay = null;
+  if (rerender) renderTree();
+}
+
 function renderDiff(diff, label) {
   networkDiff.hidden = false;
   networkDiffList.innerHTML = '';
   networkDiffTitle.textContent = `Сравнение версии «${label}» с текущей схемой`;
+
+  // Перестраиваем наложение на дерево: добавленные и изменённые узлы есть в
+  // текущем дереве и подсвечиваются; удалённых в нём уже нет — они только в
+  // списке ниже.
+  diffOverlay = hasDiff(diff) ? new Map() : null;
+  diff.added.forEach((node) => diffOverlay.set(node.id, 'added'));
+  diff.changed.forEach((node) => diffOverlay.set(node.id, 'changed'));
 
   if (!hasDiff(diff)) {
     const li = document.createElement('li');
     li.className = 'net-diff-item ok';
     li.textContent = '✓ Различий нет — текущая схема совпадает с этой версией.';
     networkDiffList.appendChild(li);
+    renderTree();
     return;
   }
 
-  const addItem = (cls, text) => {
+  // Легенда + кнопка снятия подсветки.
+  const legend = document.createElement('li');
+  legend.className = 'net-diff-legend';
+  legend.innerHTML =
+    '<span class="net-diff-swatch added"></span>добавлено' +
+    '<span class="net-diff-swatch changed"></span>изменено' +
+    '<span class="net-diff-swatch removed"></span>удалено';
+  const hideBtn = document.createElement('button');
+  hideBtn.type = 'button';
+  hideBtn.className = 'net-diff-hide-btn';
+  hideBtn.textContent = 'Скрыть подсветку';
+  hideBtn.addEventListener('click', () => {
+    networkDiff.hidden = true;
+    clearDiffOverlay({ rerender: true });
+  });
+  legend.appendChild(hideBtn);
+  networkDiffList.appendChild(legend);
+
+  // Пункт списка; для существующих в дереве узлов — кликабелен и ведёт к узлу.
+  const addItem = (cls, text, nodeId) => {
     const li = document.createElement('li');
     li.className = `net-diff-item ${cls}`;
-    li.textContent = text;
+    if (nodeId && findNode(networkTree, nodeId)) {
+      const link = document.createElement('button');
+      link.type = 'button';
+      link.className = 'net-diff-link';
+      link.textContent = text;
+      link.addEventListener('click', () => revealNode(nodeId));
+      li.appendChild(link);
+    } else {
+      li.textContent = text;
+    }
     networkDiffList.appendChild(li);
   };
 
-  diff.added.forEach((node) => addItem('added', `+ Добавлен узел «${node.name}»`));
-  diff.removed.forEach((node) => addItem('removed', `− Удалён узел «${node.name}»`));
+  diff.added.forEach((node) => addItem('added', `+ Добавлен узел «${node.name}»`, node.id));
+  diff.removed.forEach((node) => addItem('removed', `− Удалён узел «${node.name}»`, null));
   diff.changed.forEach((node) => {
     const parts = node.fields.map((field) => {
       if (field.key === 'error') {
@@ -1012,8 +1063,11 @@ function renderDiff(diff, label) {
       }
       return `${DIFF_FIELD_LABELS[field.key]}: ${formatDiffValue(field.key, field.from)} → ${formatDiffValue(field.key, field.to)}`;
     });
-    addItem('changed', `~ «${node.name}»: ${parts.join('; ')}`);
+    addItem('changed', `~ «${node.name}»: ${parts.join('; ')}`, node.id);
   });
+
+  // Применяем подсветку к дереву.
+  renderTree();
 }
 
 function nodeTag(node) {
@@ -1549,6 +1603,8 @@ function renderNodeEl(node, level = 1) {
     if (searchMatchIds.has(node.id)) wrap.classList.add('search-match');
     if (!searchPathIds.has(node.id)) wrap.classList.add('search-dim');
   }
+  const diffStatus = diffOverlay?.get(node.id);
+  if (diffStatus) wrap.classList.add(`diff-${diffStatus}`);
   wrap.addEventListener('mouseenter', () => highlightHoverPath(node.id));
   wrap.addEventListener('mouseleave', clearHoverPath);
 
