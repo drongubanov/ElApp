@@ -1372,47 +1372,10 @@ input:focus {
 }
 
 .net-tree-wrapper {
-  position: relative;
   overflow-x: auto;
   padding: 4px 0 28px;
   margin-bottom: 18px;
   cursor: grab;
-}
-
-/* Подложка PDF-схемы для трассировки: лежит первым потомком внутри
-   .net-tree-wrapper, поэтому остаётся под деревом (которое идёт следом в
-   DOM-порядке) без явного z-index. transform-origin совпадает с .net-tree
-   («top left» здесь, т.к. подложка не центрируется, а якорится к верхнему
-   левому углу), а масштаб синхронизируется с treeZoom в setTreeZoom — общий
-   scroll wrapper'а панорамирует оба слоя одинаково без отдельной геометрии. */
-.net-pdf-backdrop {
-  position: absolute;
-  top: 0;
-  left: 0;
-  transform-origin: top left;
-  pointer-events: none;
-}
-
-.net-pdf-backdrop canvas {
-  display: block;
-}
-
-.net-pdf-controls {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.net-pdf-page-nav {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.net-pdf-opacity-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
 }
 
 .net-tree-wrapper.is-panning {
