@@ -84,6 +84,10 @@ const tabButtons = document.querySelectorAll('.tab-btn');
 const tabPanels = document.querySelectorAll('.tab-panel');
 const tabNetworkPanel = document.getElementById('tab-network');
 
+const themeToggleBtn = document.getElementById('theme-toggle-btn');
+const themeToggleIcon = document.getElementById('theme-toggle-icon');
+const themeToggleLabel = document.getElementById('theme-toggle-label');
+
 const form = document.getElementById('calc-form');
 const networkTypeSelect = document.getElementById('network-type');
 const voltageInput = document.getElementById('voltage');
@@ -344,6 +348,38 @@ if (netCanvasHintClose) {
 tabButtons.forEach((btn) => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
+
+// Тема (тёмная/светлая): инлайн-скрипт в <head> уже применил сохранённый
+// выбор до первой отрисовки (см. index.html) — здесь только синхронизируем
+// вид кнопки с этим состоянием и обрабатываем переключение.
+const THEME_STORAGE_KEY = 'elapp.theme';
+
+function applyThemeToggleView(isLight) {
+  if (!themeToggleBtn) return;
+  themeToggleBtn.setAttribute('aria-pressed', String(isLight));
+  if (themeToggleIcon) themeToggleIcon.textContent = isLight ? '☀️' : '🌙';
+  if (themeToggleLabel) themeToggleLabel.textContent = isLight ? 'Светлая тема' : 'Тёмная тема';
+}
+
+applyThemeToggleView(document.documentElement.getAttribute('data-theme') === 'light');
+
+if (themeToggleBtn) {
+  themeToggleBtn.addEventListener('click', () => {
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    const next = !isLight;
+    if (next) {
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, next ? 'light' : 'dark');
+    } catch {
+      /* приватный режим / переполнение — тема просто не переживёт перезагрузку */
+    }
+    applyThemeToggleView(next);
+  });
+}
 
 window.addEventListener('resize', () => drawConnectors());
 
