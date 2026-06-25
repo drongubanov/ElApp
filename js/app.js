@@ -20,7 +20,7 @@ import { buildSheet } from './schemeSheet.js';
 import { buildSchemePdf } from './exportPdf.js';
 import { buildDxf } from './exportDxf.js';
 import { buildSpecCsv } from './schemeSpec.js';
-import { buildSpecSheet } from './specSheet.js';
+import { buildSpecSheets } from './specSheet.js';
 import { buildBom, buildBomCsv, breakerSpecLabel, cableSpecLabel } from './schemeBom.js';
 import { collectSchemeWarnings, VOLTAGE_DROP_LIMIT_PERCENT } from './schemeWarnings.js';
 import { NODE_TEMPLATES } from './nodeTemplates.js';
@@ -3305,13 +3305,11 @@ exportSpecBtn.addEventListener('click', () => {
 exportSpecPdfBtn.addEventListener('click', () => {
   if (!networkTree) return;
   try {
-    const sheet = buildSpecSheet(networkTree, {
+    const sheets = buildSpecSheets(networkTree, {
       title: networkTree.name,
       date: formatDateTime(Date.now()),
-      sheet: 1,
-      sheets: 1,
     });
-    const blob = buildSchemePdf(sheet);
+    const blob = buildSchemePdf(sheets);
     downloadBlob(blob, `${sanitizeFileName(networkTree.name)} — ведомость.pdf`);
     networkErrorMessage.textContent = '';
   } catch (err) {
