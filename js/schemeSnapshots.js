@@ -51,3 +51,18 @@ export function deleteSnapshot(id) {
   writeRaw(snapshots);
   return snapshots;
 }
+
+/**
+ * Добавляет снимок как есть (с сохранением исходного id/createdAt) — для
+ * восстановления из резервной копии, где важно отличать уже восстановленные
+ * записи от новых при повторном импорте того же файла. Не учитывается в
+ * лимите MAX_SNAPSHOTS — это восстановление существовавших данных, а не
+ * создание новых снимков.
+ */
+export function restoreSnapshot(snapshot) {
+  const snapshots = readRaw();
+  if (snapshots.some((s) => s.id === snapshot.id)) return null;
+  snapshots.push(snapshot);
+  writeRaw(snapshots);
+  return snapshot;
+}

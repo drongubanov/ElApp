@@ -11,8 +11,8 @@ import { calculateShortCircuit, checkDisconnectionByCurve } from './shortCircuit
 import { calculateTree, annotateShortCircuit, annotateVoltageDrop, DEFAULT_START_CURRENT_RATIO, EARTHING_SYSTEMS } from './network.js';
 import { DEFAULT_TARGET_POWER_FACTOR } from './reactiveCompensation.js';
 import { loadNetworkScheme, saveNetworkScheme } from './networkStorage.js';
-import { loadProjects, getProject, saveProject, deleteProject } from './networkProjects.js';
-import { loadSnapshots, getSnapshot, saveSnapshot, deleteSnapshot } from './schemeSnapshots.js';
+import { loadProjects, getProject, saveProject, deleteProject, restoreProject } from './networkProjects.js';
+import { loadSnapshots, getSnapshot, saveSnapshot, deleteSnapshot, restoreSnapshot } from './schemeSnapshots.js';
 import { diffSchemes, hasDiff } from './schemeDiff.js';
 import { topMostSelectedIds } from './treeSelection.js';
 import { buildSchemeLayout } from './schemeLayout.js';
@@ -169,6 +169,10 @@ const exportProjectBtn = document.getElementById('export-project-btn');
 const importProjectBtn = document.getElementById('import-project-btn');
 const importProjectInput = document.getElementById('import-project-input');
 const networkProjectStatus = document.getElementById('network-project-status');
+const exportBackupBtn = document.getElementById('export-backup-btn');
+const importBackupBtn = document.getElementById('import-backup-btn');
+const importBackupInput = document.getElementById('import-backup-input');
+const networkBackupStatus = document.getElementById('network-backup-status');
 const saveVersionBtn = document.getElementById('save-version-btn');
 const networkVersionSelect = document.getElementById('network-version-select');
 const compareVersionBtn = document.getElementById('compare-version-btn');
@@ -3336,6 +3340,68 @@ importProjectInput.addEventListener('change', () => {
   };
   reader.onerror = () => {
     networkErrorMessage.textContent = 'Не удалось прочитать файл проекта.';
+  };
+  reader.readAsText(file);
+});
+
+// --- Резервная копия всех проектов и версий --------------------------------
+// В отличие от export-project-btn (только текущая рабочая схема), здесь
+// архивируется весь localStorage-стейт «Конструктора сети» — именованные
+// проекты и сохранённые версии — единственная защита от их потери при
+// очистке данных браузера, пока нет облачного хранения.
+const BACKUP_FILE_FORMAT = 'elapp-network-backup';
+
+exportBackupBtn.addEventListener('click', () => {
+  const projects = loadProjects();
+  const snapshots = loadSnapshots();
+  if (!projects.length && !snapshots.length) {
+    networkBackupStatus.textContent = 'Нет сохранённых проектов или версий — нечего архивировать.';
+    return;
+  }
+  const data = JSON.stringify({ format: BACKUP_FILE_FORMAT, version: 1, projects, snapshots }, null, 2);
+  downloadBlob(new Blob([data], { type: 'application/json' }), 'elapp-резервная-копия.json');
+  networkBackupStatus.textContent = `Сохранено: ${projects.length} проект(ов), ${snapshots.length} версия(й).`;
+});
+
+importBackupBtn.addEventListener('click', () => importBackupInput.click());
+
+importBackupInput.addEventListener('change', () => {
+  const file = importBackupInput.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    importBackupInput.value = '';
+    let parsed;
+    try {
+      parsed = JSON.parse(String(reader.result));
+    } catch {
+      networkBackupStatus.textContent = 'Не удалось загрузить резервную копию: файл не является корректным JSON.';
+      return;
+    }
+    const projects = Array.isArray(parsed?.projects) ? parsed.projects : [];
+    const snapshots = Array.isArray(parsed?.snapshots) ? parsed.snapshots : [];
+    if (!projects.length && !snapshots.length) {
+      networkBackupStatus.textContent = 'Файл не содержит проектов или версий в ожидаемом формате.';
+      return;
+    }
+    let addedProjects = 0;
+    let addedSnapshots = 0;
+    projects.forEach((project) => {
+      if (!project?.id) return;
+      if (restoreProject(project)) addedProjects += 1;
+    });
+    snapshots.forEach((snapshot) => {
+      if (!snapshot?.id) return;
+      if (restoreSnapshot(snapshot)) addedSnapshots += 1;
+    });
+    renderProjectList();
+    renderVersionList();
+    networkBackupStatus.textContent =
+      `Восстановлено: ${addedProjects} проект(ов), ${addedSnapshots} версия(й) ` +
+      `(уже существовавшие записи пропущены).`;
+  };
+  reader.onerror = () => {
+    networkBackupStatus.textContent = 'Не удалось прочитать файл резервной копии.';
   };
   reader.readAsText(file);
 });
