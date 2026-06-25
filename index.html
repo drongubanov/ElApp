@@ -191,12 +191,13 @@
         блока есть свои кнопки: ⚙ — открыть параметры, ▾/▸ — свернуть/развернуть ветвь, + —
         добавить дочерний узел (пустой или по шаблону: розеточная группа, освещение,
         электродвигатель). Правый клик или долгое нажатие на блоке открывает меню с редкими
-        действиями: ⧉ дублировать узел вместе с поддеревом и − удалить узел. Узел (кроме
-        корневого) можно перетащить на другой узел, чтобы перенести его вместе с поддеревом в новое
-        место схемы. Ctrl+клик по узлам выделяет несколько узлов сразу — для групповых операций
-        (дублировать, удалить, перетащить вместе). Горячие клавиши на выбранном узле: Delete — удалить,
-        Ctrl+D — дублировать, Ctrl+Z — отменить последнее действие. Кнопка «Рассчитать сеть» подбирает
-        автоматы и кабели для всех линий дерева.
+        действиями: ⧉ дублировать узел вместе с поддеревом, копировать/вставить поддерево и − удалить
+        узел. Узел (кроме корневого) можно перетащить на другой узел, чтобы перенести его вместе с
+        поддеревом в новое место схемы. Ctrl+клик по узлам выделяет несколько узлов сразу — для
+        групповых операций (дублировать, удалить, перетащить вместе, изменить общие параметры).
+        Горячие клавиши на выбранном узле: Delete — удалить, Ctrl+D — дублировать, Ctrl+C/Ctrl+V —
+        копировать/вставить поддерево, Ctrl+Z — отменить последнее действие. Кнопка «Рассчитать сеть»
+        подбирает автоматы и кабели для всех линий дерева.
       </p>
 
       <details class="net-section" id="net-projects-section">
@@ -285,6 +286,11 @@
           <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="2.5" y="2.5" width="11" height="11" rx="1"/><line x1="2.5" y1="8" x2="13.5" y2="8"/><line x1="8" y1="2.5" x2="8" y2="13.5"/></svg>
           Теплокарта
         </button>
+        <button type="button" id="current-toggle-btn" class="btn-secondary" aria-pressed="false"
+          title="Показывать расчётный ток на всех линиях без наведения">
+          <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="5.5"/><path d="M8.5 5 6 9h2l-.5 2.5L10 8H8l.5-3Z" fill="currentColor" stroke="none"/></svg>
+          Токи на линиях
+        </button>
         <div class="net-export-menu">
           <button type="button" id="export-menu-btn" class="btn-secondary btn-export"
             aria-haspopup="true" aria-expanded="false" aria-controls="export-dropdown"
@@ -293,28 +299,36 @@
             Экспорт ▾
           </button>
           <div class="net-export-dropdown" id="export-dropdown" role="menu" hidden>
-            <button type="button" id="export-pdf-btn" role="menuitem" title="Сохранить однолинейную схему в PDF">
-              Схема в PDF
-            </button>
-            <button type="button" id="export-dxf-btn" role="menuitem" title="Сохранить однолинейную схему в DXF (открывается в AutoCAD и др. CAD)">
-              Схема в DXF (CAD)
-            </button>
-            <button type="button" id="export-spec-btn" role="menuitem" title="Сохранить сводную ведомость линий сети в CSV (Excel)">
-              Ведомость в CSV (Excel)
-            </button>
-            <button type="button" id="export-spec-pdf-btn" role="menuitem" title="Сохранить оформленную ведомость линий сети в PDF (со штампом, для проектной документации)">
-              Ведомость в PDF
-            </button>
-            <button type="button" id="export-bom-btn" role="menuitem" title="Сохранить сводную спецификацию оборудования (автоматы и кабели по типам) в CSV (Excel)">
-              Спецификация оборудования в CSV
-            </button>
+            <div class="net-export-group" role="group" aria-label="Схема">
+              <p class="net-export-group-title" aria-hidden="true">Схема</p>
+              <button type="button" id="export-pdf-btn" role="menuitem" title="Сохранить однолинейную схему в PDF">
+                Схема в PDF
+              </button>
+              <button type="button" id="export-dxf-btn" role="menuitem" title="Сохранить однолинейную схему в DXF (открывается в AutoCAD и др. CAD)">
+                Схема в DXF (CAD)
+              </button>
+            </div>
+            <div class="net-export-group" role="group" aria-label="Ведомость">
+              <p class="net-export-group-title" aria-hidden="true">Ведомость</p>
+              <button type="button" id="export-spec-btn" role="menuitem" title="Сохранить сводную ведомость линий сети в CSV (Excel)">
+                Ведомость в CSV (Excel)
+              </button>
+              <button type="button" id="export-spec-pdf-btn" role="menuitem" title="Сохранить оформленную ведомость линий сети в PDF (со штампом, для проектной документации)">
+                Ведомость в PDF
+              </button>
+              <button type="button" id="export-bom-btn" role="menuitem" title="Сохранить сводную спецификацию оборудования (автоматы и кабели по типам) в CSV (Excel)">
+                Спецификация оборудования в CSV
+              </button>
+            </div>
           </div>
         </div>
         </div>
-        <button type="button" id="reset-network-btn" class="btn-secondary btn-danger" title="Удалить все узлы и параметры и начать сначала">
-          <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M12.6 5.4A5 5 0 1 0 13.2 9"/><path d="M12.9 2.4v3.2H9.7"/></svg>
-          Сбросить сеть
-        </button>
+        <div class="net-actions-danger-row">
+          <button type="button" id="reset-network-btn" class="btn-secondary btn-danger" title="Удалить все узлы и параметры и начать сначала">
+            <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M12.6 5.4A5 5 0 1 0 13.2 9"/><path d="M12.9 2.4v3.2H9.7"/></svg>
+            Сбросить сеть
+          </button>
+        </div>
       </div>
       <p class="error-message" id="network-error-message" role="alert"></p>
 
@@ -339,8 +353,8 @@
           <line x1="15" y1="29" x2="22" y2="29" />
           <path d="M27 33l4 4 8-9" />
         </svg>
-        <p class="net-empty-title">Сеть ещё не рассчитана</p>
-        <p class="net-empty-text">
+        <p class="net-empty-title" id="net-empty-title">Сеть ещё не рассчитана</p>
+        <p class="net-empty-text" id="net-empty-text">
           Соберите дерево узлов и нажмите «Рассчитать сеть» — подберём автоматы и кабели
           для всех линий и проверим схему: токи, потерю напряжения, баланс и селективность.
         </p>
@@ -349,29 +363,73 @@
 
       <div class="net-search">
         <input type="search" id="network-search" class="net-search-input"
-          placeholder="Поиск узла по названию…" aria-label="Поиск узла по названию" autocomplete="off" />
+          placeholder="Поиск узла по названию или параметру (например, i>16, p<5, сечение>4)…"
+          title="Поддерживается поиск по параметрам: i (ток, А), p (мощность, кВт), u (напряжение, В), b (автомат, А), сечение (мм²) — со знаком >, <, >=, <= или =. Например: i>16"
+          aria-label="Поиск узла по названию или электрическому параметру" autocomplete="off" />
         <span id="network-search-status" class="note-line" role="status" aria-live="polite"></span>
       </div>
 
       <div class="net-multi-actions" id="net-multi-actions" hidden>
         <span class="net-multi-count" id="net-multi-count"></span>
+        <button type="button" id="multi-bulk-edit-btn" class="btn-secondary" aria-haspopup="true" aria-expanded="false" aria-controls="net-bulk-edit-panel">✎ Общие параметры</button>
         <button type="button" id="multi-duplicate-btn" class="btn-secondary">⧉ Дублировать выбранные</button>
         <button type="button" id="multi-delete-btn" class="btn-secondary">− Удалить выбранные</button>
         <button type="button" id="multi-clear-btn" class="btn-secondary">Снять выделение</button>
       </div>
 
+      <div class="net-bulk-edit-panel" id="net-bulk-edit-panel" hidden>
+        <p class="net-bulk-edit-hint">
+          Отмеченные поля будут применены ко всем выбранным узлам (кроме корня сети, если он входит в выбор).
+        </p>
+        <div class="net-bulk-edit-row">
+          <label class="net-bulk-edit-check" for="bulk-installation">
+            <input type="checkbox" id="bulk-apply-installation" /> Способ прокладки
+          </label>
+          <select id="bulk-installation" disabled>
+            <option value="air">Открыто в воздухе</option>
+            <option value="conduit">В трубе / кабель-канале / штукатурке</option>
+            <option value="tray">На лотке / в пучке</option>
+          </select>
+        </div>
+        <div class="net-bulk-edit-row">
+          <label class="net-bulk-edit-check" for="bulk-insulation">
+            <input type="checkbox" id="bulk-apply-insulation" /> Изоляция жилы
+          </label>
+          <select id="bulk-insulation" disabled>
+            <option value="pvc">ПВХ (макс. +70 °C)</option>
+            <option value="xlpe">Сшитый полиэтилен, СПЭ (макс. +90 °C)</option>
+          </select>
+        </div>
+        <div class="net-bulk-edit-row">
+          <label class="net-bulk-edit-check" for="bulk-ambient">
+            <input type="checkbox" id="bulk-apply-ambient" /> Температура среды, °C
+          </label>
+          <input type="number" id="bulk-ambient" inputmode="numeric" step="1" min="-40" max="89" disabled />
+        </div>
+        <div class="net-bulk-edit-row">
+          <label class="net-bulk-edit-check" for="bulk-pf">
+            <input type="checkbox" id="bulk-apply-pf" /> cos φ нагрузки
+          </label>
+          <input type="number" id="bulk-pf" inputmode="decimal" step="0.01" min="0.01" max="1" disabled />
+        </div>
+        <div class="net-bulk-edit-actions">
+          <button type="button" id="bulk-edit-apply-btn" class="btn-primary">Применить</button>
+          <button type="button" id="bulk-edit-cancel-btn" class="btn-secondary">Отмена</button>
+        </div>
+      </div>
+
       <div class="heatmap-legend" id="heatmap-legend" hidden>
-        <span class="heatmap-legend-caption">Шкала нагрузки (расчётный ток):</span>
-        <span class="heatmap-legend-value" id="heatmap-legend-min"></span>
+        <span class="heatmap-legend-caption">Шкала нагрузки (доля от номинала автомата узла):</span>
+        <span class="heatmap-legend-value" id="heatmap-legend-min">0%</span>
         <div class="heatmap-legend-scale">
           <span class="heatmap-legend-bar" id="heatmap-legend-bar"></span>
           <div class="heatmap-legend-bands">
             <span>низкая</span>
             <span>средняя</span>
-            <span>высокая</span>
+            <span>высокая (≥100%)</span>
           </div>
         </div>
-        <span class="heatmap-legend-value" id="heatmap-legend-max"></span>
+        <span class="heatmap-legend-value" id="heatmap-legend-max">100%+</span>
       </div>
 
       <div class="net-workspace">
@@ -381,6 +439,9 @@
             <button type="button" id="net-zoom-reset-btn" class="net-zoom-btn net-zoom-level" title="Сбросить масштаб до 100%">100%</button>
             <button type="button" id="net-zoom-in-btn" class="net-zoom-btn" title="Увеличить масштаб">+</button>
             <button type="button" id="net-zoom-fit-btn" class="net-zoom-btn" title="Вписать дерево в экран" aria-label="Вписать дерево в экран">⛶</button>
+            <span class="net-zoom-sep" aria-hidden="true"></span>
+            <button type="button" id="net-expand-all-btn" class="net-zoom-btn" title="Развернуть все узлы" aria-label="Развернуть все узлы">⊞</button>
+            <button type="button" id="net-collapse-all-btn" class="net-zoom-btn" title="Свернуть все узлы" aria-label="Свернуть все узлы">⊟</button>
           </div>
           <ul class="net-tree" id="network-tree" role="tree" aria-label="Дерево узлов сети"></ul>
           <div class="net-canvas-hint" id="net-canvas-hint" role="status" hidden>
@@ -424,6 +485,11 @@
         <div class="field">
           <label for="node-name">Название</label>
           <input type="text" id="node-name" />
+        </div>
+
+        <div class="field">
+          <label for="node-comment">Примечание</label>
+          <textarea id="node-comment" rows="2" placeholder="Заметка по узлу — не влияет на расчёт"></textarea>
         </div>
 
         <label class="net-checkbox">
@@ -683,6 +749,14 @@
       <div class="net-add-menu" id="node-add-menu" role="menu" aria-label="Добавить узел" hidden></div>
 
       <div class="net-add-menu net-context-menu" id="node-context-menu" role="menu" aria-label="Действия с узлом" hidden>
+        <button type="button" id="context-copy-btn" role="menuitem">
+          <span class="net-add-menu-label">⧉ Копировать</span>
+          <span class="net-add-menu-hint">Узел с поддеревом в буфер (Ctrl+C)</span>
+        </button>
+        <button type="button" id="context-paste-btn" role="menuitem" disabled>
+          <span class="net-add-menu-label">📋 Вставить</span>
+          <span class="net-add-menu-hint">Из буфера как дочерний узел (Ctrl+V)</span>
+        </button>
         <button type="button" id="context-duplicate-btn" role="menuitem">
           <span class="net-add-menu-label">⧉ Дублировать</span>
           <span class="net-add-menu-hint">Копия узла вместе с поддеревом</span>

@@ -1,6 +1,6 @@
 // Сравнение двух версий схемы сети: что изменилось в расчётных величинах
-// (активная мощность P, расчётный ток I, номинал автомата) по каждому узлу, а
-// также какие узлы добавлены/удалены. Узлы сопоставляются по их id (он не
+// (активная мощность P, расчётный ток I, номинал автомата, сечение и материал
+// кабеля) по каждому узлу, а также какие узлы добавлены/удалены. Узлы сопоставляются по их id (он не
 // меняется при редактировании и переносе узла, а у копий — новый), поэтому diff
 // отражает эволюцию одной и той же схемы между сохранёнными версиями. Модуль
 // независим от DOM и проверяется модульными тестами; форматирование значений —
@@ -12,6 +12,12 @@ function flatten(calcNode, map) {
   map.set(calcNode.id, calcNode);
   calcNode.children.forEach((child) => flatten(child, map));
   return map;
+}
+
+function cableInfo(protection) {
+  if (protection?.copperCable) return { material: 'медь', section: protection.copperCable.section };
+  if (protection?.aluminumCable) return { material: 'алюминий', section: protection.aluminumCable.section };
+  return null;
 }
 
 // Поля сравниваются с допуском, чтобы числовой шум с плавающей точкой не
@@ -57,6 +63,12 @@ export function diffSchemes(treeA, treeB) {
     const breakerFrom = na.protection?.breaker ?? null;
     const breakerTo = nb.protection?.breaker ?? null;
     if (breakerFrom !== breakerTo) fields.push({ key: 'breaker', from: breakerFrom, to: breakerTo });
+
+    const cableFrom = cableInfo(na.protection);
+    const cableTo = cableInfo(nb.protection);
+    if (cableFrom?.material !== cableTo?.material || cableFrom?.section !== cableTo?.section) {
+      fields.push({ key: 'cable', from: cableFrom, to: cableTo });
+    }
 
     // Появление/исчезновение ошибки расчёта в узле — тоже значимое изменение.
     const errorFrom = na.error ?? null;
