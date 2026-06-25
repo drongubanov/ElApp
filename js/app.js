@@ -1106,6 +1106,11 @@ function addChildToNode(parentId, overrides = {}) {
   persistNetworkScheme();
   renderTree();
   renderPanel();
+  // Сразу открываем поле названия для правки — иначе однотипные узлы
+  // («Новый узел 2», «Новый узел 3»...) приходится переименовывать отдельным
+  // двойным кликом уже после добавления.
+  const nameEl = networkTreeEl.querySelector(`.net-node-wrap[data-id="${child.id}"] .net-node-name`);
+  if (nameEl) startRenameNode(child, nameEl);
 }
 
 // --- Меню добавления узла (пустой узел + шаблоны типовых узлов) -------------
