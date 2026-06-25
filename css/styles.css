@@ -1305,6 +1305,72 @@ textarea:focus {
   border-left-color: var(--color-success);
 }
 
+/* Легенда наложения сравнения на схему + кнопка снятия подсветки. */
+.net-diff-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.net-diff-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  margin-right: 2px;
+}
+
+.net-diff-swatch.added {
+  background: var(--color-success);
+}
+
+.net-diff-swatch.changed {
+  background: var(--color-accent);
+}
+
+.net-diff-swatch.removed {
+  background: var(--color-danger);
+}
+
+.net-diff-hide-btn {
+  margin-left: auto;
+  padding: 3px 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.net-diff-hide-btn:hover,
+.net-diff-hide-btn:focus-visible {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* Пункт списка-ссылка: ведёт к узлу на схеме. Внешне как обычный текст пункта,
+   но кликабелен и доступен с клавиатуры. */
+.net-diff-link {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.net-diff-link:hover,
+.net-diff-link:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
 /* --- Панель групповых операций (множественный выбор) ---------------------- */
 .net-multi-actions {
   display: flex;
@@ -1941,6 +2007,20 @@ textarea:focus {
   box-shadow:
     0 0 0 2px var(--color-accent),
     0 6px 18px rgba(245, 158, 11, 0.28);
+}
+
+/* Наложение результатов сравнения версий: добавленные/изменённые узлы текущего
+   дерева подсвечиваются кольцом цвета соответствующей категории (как в легенде
+   и списке справа). Цель — направленный child-селектор, чтобы подсветка узла не
+   распространялась на его вложенные карточки. */
+.net-node-wrap.diff-added > .net-node {
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 2px var(--color-success);
+}
+
+.net-node-wrap.diff-changed > .net-node {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent);
 }
 
 .net-node[draggable='true'] {
