@@ -199,47 +199,6 @@
         автоматы и кабели для всех линий дерева.
       </p>
 
-      <details class="net-section" id="net-pdf-section">
-        <summary class="net-section-summary">PDF-подложка для трассировки</summary>
-        <div class="net-section-body">
-        <p class="note">
-          Загрузите PDF с готовой схемой электросети, чтобы увидеть её как полупрозрачную
-          подложку на холсте дерева ниже — это помогает вручную перенести структуру схемы
-          в узлы конструктора. Автоматическое распознавание схемы не выполняется, перенести
-          узлы и связи нужно вручную. Файл обрабатывается полностью локально в браузере
-          и никуда не передаётся.
-        </p>
-
-        <div class="net-projects-row">
-          <button type="button" id="pdf-backdrop-upload-btn" class="btn-secondary">
-            ↥ Загрузить PDF…
-          </button>
-          <input type="file" id="pdf-backdrop-input" accept="application/pdf,.pdf" hidden />
-          <button type="button" id="pdf-backdrop-remove-btn" class="btn-secondary" hidden>
-            ✕ Убрать подложку
-          </button>
-        </div>
-
-        <div class="net-pdf-controls" id="pdf-backdrop-controls" hidden>
-          <div class="net-pdf-page-nav">
-            <button type="button" id="pdf-backdrop-prev-btn" class="net-zoom-btn" title="Предыдущая страница">‹</button>
-            <span class="note-line" id="pdf-backdrop-page-label"></span>
-            <button type="button" id="pdf-backdrop-next-btn" class="net-zoom-btn" title="Следующая страница">›</button>
-          </div>
-          <div class="net-pdf-opacity-row">
-            <label for="pdf-backdrop-opacity">Прозрачность подложки</label>
-            <input type="range" id="pdf-backdrop-opacity" min="10" max="90" step="5" value="40" />
-          </div>
-          <label class="net-checkbox">
-            <input type="checkbox" id="pdf-backdrop-visible" checked />
-            Показывать подложку на холсте
-          </label>
-        </div>
-
-        <p id="pdf-backdrop-status" class="note-line"></p>
-        </div>
-      </details>
-
       <details class="net-section" id="net-projects-section">
         <summary class="net-section-summary">Проекты сети</summary>
         <div class="net-section-body">
@@ -417,7 +376,6 @@
 
       <div class="net-workspace">
         <div class="net-tree-wrapper" id="network-tree-wrapper">
-          <div class="net-pdf-backdrop" id="net-pdf-backdrop" hidden></div>
           <div class="net-zoom-controls" role="group" aria-label="Масштаб дерева">
             <button type="button" id="net-zoom-out-btn" class="net-zoom-btn" title="Уменьшить масштаб">−</button>
             <button type="button" id="net-zoom-reset-btn" class="net-zoom-btn net-zoom-level" title="Сбросить масштаб до 100%">100%</button>
