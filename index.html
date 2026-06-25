@@ -5,11 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ElApp — расчёт мощности и тока</title>
   <link rel="stylesheet" href="css/styles.css" />
+  <script>
+    // Применяем сохранённую тему до первой отрисовки — иначе при светлой теме
+    // на долю секунды мелькнёт тёмная (тема по умолчанию из CSS-переменных).
+    (function () {
+      if (localStorage.getItem('elapp.theme') === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
 </head>
 <body>
   <header class="app-header">
-    <h1>⚡ ElApp</h1>
-    <p class="subtitle">Расчёт мощности и тока в сетях постоянного и переменного тока</p>
+    <div class="app-header-text">
+      <h1>⚡ ElApp</h1>
+      <p class="subtitle">Расчёт мощности и тока в сетях постоянного и переменного тока</p>
+    </div>
+    <button type="button" id="theme-toggle-btn" class="theme-toggle-btn" aria-pressed="false"
+      title="Переключить светлую/тёмную тему">
+      <span id="theme-toggle-icon" aria-hidden="true">🌙</span>
+      <span id="theme-toggle-label">Тёмная тема</span>
+    </button>
   </header>
 
   <nav class="tabs" role="tablist">
@@ -237,6 +253,26 @@
         </div>
 
         <p id="network-project-status" class="note-line"></p>
+
+        <p class="note">
+          Сохранённые проекты и версии хранятся только в этом браузере — очистка его данных удалит
+          их безвозвратно. Резервная копия сохраняет все проекты и версии в один файл; восстановление
+          из неё дополняет уже имеющиеся данные и ничего не удаляет.
+        </p>
+
+        <div class="net-projects-row">
+          <button type="button" id="export-backup-btn" class="btn-secondary btn-export"
+            title="Сохранить все сохранённые проекты и версии в один файл .json">
+            ↧ Резервная копия всех проектов и версий (.json)
+          </button>
+          <button type="button" id="import-backup-btn" class="btn-secondary"
+            title="Восстановить проекты и версии из файла резервной копии (дополняет текущие, ничего не удаляет)">
+            ↥ Восстановить из резервной копии (.json)
+          </button>
+          <input type="file" id="import-backup-input" accept="application/json,.json" hidden />
+        </div>
+
+        <p id="network-backup-status" class="note-line"></p>
         </div>
       </details>
 

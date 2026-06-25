@@ -22,6 +22,41 @@
   --space-5: 24px;
 }
 
+/* Светлая тема — переключается атрибутом data-theme на <html> (см. JS-обработчик
+   #theme-toggle-btn и инлайн-скрипт в <head>, который применяет тему до первой
+   отрисовки). Тот же набор переменных используется и для печатной версии ниже,
+   поэтому палитра подобрана с запасом контраста на белом фоне. */
+:root[data-theme='light'] {
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f1f5f9;
+  --color-border: #cbd5e1;
+  --color-text: #1e293b;
+  --color-text-muted: #475569;
+  --color-accent: #b45309;
+  --color-accent-dark: #92400e;
+  --color-danger: #dc2626;
+  --color-success: #15803d;
+}
+
+/* Печать всегда идёт по светлой палитре независимо от выбранной на экране
+   темы — тёмный фон страницы при печати тратит тонер/чернила и плохо читается
+   на бумаге. */
+@media print {
+  :root {
+    --color-bg: #f8fafc;
+    --color-surface: #ffffff;
+    --color-surface-alt: #f1f5f9;
+    --color-border: #cbd5e1;
+    --color-text: #1e293b;
+    --color-text-muted: #475569;
+    --color-accent: #b45309;
+    --color-accent-dark: #92400e;
+    --color-danger: #dc2626;
+    --color-success: #15803d;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -35,6 +70,7 @@ body {
 }
 
 .app-header {
+  position: relative;
   padding: var(--space-5) var(--space-4) var(--space-2);
   text-align: center;
 }
@@ -48,6 +84,41 @@ body {
   margin: var(--space-1) 0 0;
   color: var(--color-text-muted);
   font-size: 0.95rem;
+}
+
+.theme-toggle-btn {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.theme-toggle-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.theme-toggle-btn:focus-visible {
+  border-color: var(--color-accent);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+/* Печатная версия не нуждается в кнопке переключения темы — печать всегда
+   светлая (см. @media print выше). */
+@media print {
+  .theme-toggle-btn {
+    display: none;
+  }
 }
 
 .tabs {
@@ -1933,8 +2004,8 @@ textarea:focus {
 }
 
 .net-node-icon-btn {
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -2300,6 +2371,18 @@ textarea:focus {
 
   .app-header h1 {
     font-size: 1.45rem;
+  }
+
+  /* На узком экране подпись кнопки перекрывала бы центрированный заголовок —
+     оставляем только иконку и уменьшаем отступы от края. */
+  .theme-toggle-btn {
+    top: var(--space-2);
+    right: var(--space-2);
+    padding: 4px 6px;
+  }
+
+  #theme-toggle-label {
+    display: none;
   }
 
   main {

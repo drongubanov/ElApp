@@ -58,3 +58,17 @@ export function deleteProject(id) {
   writeRaw(projects);
   return projects;
 }
+
+/**
+ * Добавляет проект как есть (с сохранением исходного id/createdAt/updatedAt) —
+ * используется при восстановлении из резервной копии, где важно отличать уже
+ * восстановленные записи от новых при повторном импорте того же файла.
+ * Ничего не делает, если проект с таким id уже есть.
+ */
+export function restoreProject(project) {
+  const projects = readRaw();
+  if (projects.some((p) => p.id === project.id)) return null;
+  projects.push(project);
+  writeRaw(projects);
+  return project;
+}
