@@ -37,14 +37,41 @@ function sampleTree() {
   };
 }
 
-test('buildSchemeLayout строит блок на каждый узел и связь на каждое ребро', () => {
+test('buildSchemeLayout строит блок на каждый узел и связь на каждое ребро (плюс вводная линия ВРУ)', () => {
   const layout = buildSchemeLayout(sampleTree());
   assert.equal(layout.boxes.length, 3);
-  assert.equal(layout.edges.length, 2);
+  // Связь на каждое ребро дерева (2) + вводная линия, питающая корневой щит.
+  assert.equal(layout.edges.length, 3);
   assert.equal(layout.hasErrors, false);
   // Размер поля схемы положителен и кратен размеру блока.
   assert.ok(layout.width >= BOX_W);
   assert.ok(layout.height >= BOX_H);
+});
+
+test('buildSchemeLayout: вводная линия ВРУ подписана автоматом и кабелем по суммарной нагрузке дерева', () => {
+  const layout = buildSchemeLayout(sampleTree());
+  const root = layout.boxes.find((b) => b.id === 'root');
+  const rootCx = root.x + root.w / 2;
+
+  const incoming = layout.edges.find((e) => e.points[0].x === rootCx && e.points[0].y === 0);
+  assert.ok(incoming, 'должна быть линия, входящая в верхнюю границу схемы над корневым блоком');
+  assert.equal(incoming.points[incoming.points.length - 1].y, root.y);
+  assert.match(incoming.lines.join(' '), /Вводной кабель/);
+  assert.match(incoming.lines.join(' '), /QF/);
+  assert.match(incoming.lines.join(' '), /мм2/);
+
+  // Автомат и кабель вводной линии подбираются по суммарной нагрузке всего
+  // дерева — без дочерних узлов (которые дают почти весь ток) номинал заметно
+  // меньше, чем с ними.
+  const withoutChildren = sampleTree();
+  withoutChildren.children = [];
+  withoutChildren.hasOwnLoad = true;
+  withoutChildren.known = 'power';
+  withoutChildren.knownValue = 24;
+  const soloLayout = buildSchemeLayout(withoutChildren);
+  const soloRoot = soloLayout.boxes.find((b) => b.id === 'root');
+  const soloIncoming = soloLayout.edges.find((e) => e.points[0].x === soloRoot.x + soloRoot.w / 2 && e.points[0].y === 0);
+  assert.notEqual(soloIncoming.lines.join(' '), incoming.lines.join(' '));
 });
 
 test('buildSchemeLayout: корневой блок центрирован над дочерними', () => {
