@@ -100,6 +100,15 @@ function flattenCalc(calcNode, map) {
  * Расчёт (calculateTree) выполняется заново при каждом построении, поэтому
  * экспорт всегда отражает актуальные параметры узлов, даже если пользователь
  * не нажимал «Рассчитать сеть». Исходное дерево не модифицируется.
+ *
+ * Помимо связей между узлом и его дочерними узлами, схема дополнительно
+ * показывает вводную линию, питающую корневой щит (ВРУ) от внешней сети —
+ * короткий отрезок над его блоком с тем же подписями автомата и кабеля, что
+ * и у остальных связей. Автомат и кабель для него берутся из расчёта самого
+ * корневого узла: calculateNode/calculateTree уже подбирают их по суммарному
+ * току всего дерева (собственная нагрузка ВРУ, если есть, плюс нагрузка всех
+ * дочерних узлов с учётом коэффициента одновременности) — здесь это значение
+ * просто визуализируется на схеме, а не пересчитывается.
  */
 export function buildSchemeLayout(tree) {
   const calcTree = calculateTree(tree);
@@ -111,7 +120,19 @@ export function buildSchemeLayout(tree) {
 
   const boxes = [];
   const edges = [];
-  place(tree, 0, 0, widths, calcMap, boxes, edges);
+  place(tree, 0, V_GAP, widths, calcMap, boxes, edges);
+
+  const root = boxes[0];
+  const rootCx = root.x + root.w / 2;
+  edges.push({
+    points: [
+      { x: rootCx, y: 0 },
+      { x: rootCx, y: root.y },
+    ],
+    lines: ['Вводной кабель', ...edgeLines(calcMap.get(tree.id))],
+    labelX: rootCx + 2,
+    labelY: root.y * 0.3,
+  });
 
   const width = Math.max(...boxes.map((b) => b.x + b.w));
   const height = Math.max(...boxes.map((b) => b.y + b.h));

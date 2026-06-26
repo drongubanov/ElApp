@@ -1789,6 +1789,8 @@ textarea:focus {
   position: relative;
   transform-origin: top center;
   transition: transform 0.15s ease;
+  /* Место для вводной линии ВРУ над корневым блоком (см. drawConnectors). */
+  padding-top: 44px;
 }
 
 /* SVG-слой с плавными bezier-линиями кабелей, соединяющими блоки.

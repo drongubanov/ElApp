@@ -2120,6 +2120,27 @@ function drawConnectors() {
   // линию (в т.ч. участки соседних ветвей), а не наоборот.
   const currentMarks = [];
 
+  // Вводная линия ВРУ: короткий вертикальный отрезок над корневым блоком,
+  // визуализирующий питание щита от внешней сети — автомат и кабель для
+  // него уже подобраны по суммарной нагрузке всего дерева (см. network.js),
+  // здесь только рисуется линия и кружок тока, без отдельного расчёта.
+  const rootWrap = tree.querySelector(':scope > li > .net-node-wrap');
+  if (rootWrap) {
+    const rr = rootWrap.getBoundingClientRect();
+    const rx = toLocal(rr.left - treeRect.left + rr.width / 2);
+    const ry = toLocal(rr.top - treeRect.top);
+    const incoming = document.createElementNS(SVG_NS, 'path');
+    incoming.setAttribute('class', 'net-connector');
+    incoming.setAttribute('d', `M ${rx} 0 L ${rx} ${ry}`);
+    incoming.dataset.child = networkTree.id;
+    svg.appendChild(incoming);
+
+    const rootCalc = lastCalcMap?.get(networkTree.id);
+    if (rootCalc && !rootCalc.error) {
+      currentMarks.push(buildConnectorCurrentMark(networkTree.id, rx, ry / 2, rootCalc.result.I));
+    }
+  }
+
   tree.querySelectorAll('.net-node-wrap.has-children').forEach((wrap) => {
     const li = wrap.parentElement;
     const childUl = li.querySelector(':scope > ul');
