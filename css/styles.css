@@ -2384,6 +2384,73 @@ textarea:focus {
   border-top: none;
 }
 
+.ref-chapter-title {
+  margin: 0;
+}
+
+/* Заголовок главы — кнопка на всю ширину, раскрывающая/сворачивающая главу.
+   Шрифт наследуется от h3 (жирность/размер браузерных стилей по умолчанию),
+   поэтому визуально заголовок не отличается от прежнего статического h3. */
+.ref-chapter-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  background: none;
+  border: none;
+  margin: 0;
+  padding: var(--space-1) 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+
+.ref-chapter-toggle:hover {
+  color: var(--color-accent);
+}
+
+.ref-chapter-toggle:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.ref-chapter-toggle-icon {
+  flex: none;
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  border-style: solid;
+  border-width: 0.35em 0 0.35em 0.5em;
+  border-color: transparent transparent transparent currentColor;
+  transition: transform 0.2s ease;
+}
+
+.ref-chapter-toggle[aria-expanded="true"] .ref-chapter-toggle-icon {
+  transform: rotate(90deg);
+}
+
+/* Плавное раскрытие по высоте: max-height анимируется через инлайн-стиль,
+   выставляемый в JS (toggleRefChapter в app.js) по фактической высоте
+   содержимого — у глав разный объём текста и формул, фиксированное значение
+   не подошло бы всем. До первого раскрытия и после сворачивания панель
+   получает [hidden], чтобы её содержимое не попадало в таб-порядок и
+   объявления скринридера. */
+.ref-chapter-panel {
+  overflow: hidden;
+  max-height: 0;
+}
+
+.ref-chapter-panel:not([hidden]) {
+  transition: max-height 0.3s ease;
+}
+
+.ref-chapter-panel-inner {
+  padding-top: var(--space-4);
+}
+
 .ref-table-wrapper {
   overflow-x: auto;
 }

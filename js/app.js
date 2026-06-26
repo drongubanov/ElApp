@@ -3958,16 +3958,76 @@ form.addEventListener('submit', (event) => {
   );
 });
 
-// --- Перекрёстные ссылки из калькулятора в справочник -----------------------
-// Ссылки с классом ref-link открывают вкладку «Справка» и прокручивают к
-// нужной главе (внутри неактивной вкладки якоря не работают сами по себе).
+// --- Главы справочника: свёрнутый по умолчанию аккордеон --------------------
+// Каждая глава — <section class="ref-chapter">, заголовок которой — кнопка
+// ref-chapter-toggle, раскрывающая соседнюю панель ref-chapter-panel. Высота
+// у глав разная (от пары формул до длинного глоссария), поэтому max-height
+// для плавной анимации считается в JS по фактической scrollHeight, а не
+// задаётся фиксированным числом в CSS.
+function setRefChapterExpanded(toggle, expand) {
+  const panel = document.getElementById(toggle.getAttribute('aria-controls'));
+  if (!panel) return;
+  toggle.setAttribute('aria-expanded', String(expand));
+
+  if (expand) {
+    panel.hidden = false;
+    const target = panel.scrollHeight;
+    requestAnimationFrame(() => {
+      panel.style.maxHeight = `${target}px`;
+    });
+  } else {
+    panel.style.maxHeight = `${panel.scrollHeight}px`;
+    requestAnimationFrame(() => {
+      panel.style.maxHeight = '0px';
+    });
+    panel.addEventListener(
+      'transitionend',
+      (event) => {
+        if (event.propertyName === 'max-height' && toggle.getAttribute('aria-expanded') === 'false') {
+          panel.hidden = true;
+        }
+      },
+      { once: true },
+    );
+  }
+}
+
+document.querySelectorAll('.ref-chapter-toggle').forEach((toggle) => {
+  toggle.addEventListener('click', () => {
+    setRefChapterExpanded(toggle, toggle.getAttribute('aria-expanded') !== 'true');
+  });
+});
+
+// Если глава уже раскрыта, при изменении размера окна (поворот экрана,
+// ресайз) пересчитываем max-height — иначе после переноса строк в новой
+// ширине контейнера содержимое могло бы обрезаться зафиксированной высотой.
+window.addEventListener('resize', () => {
+  document.querySelectorAll('.ref-chapter-toggle[aria-expanded="true"]').forEach((toggle) => {
+    const panel = document.getElementById(toggle.getAttribute('aria-controls'));
+    if (panel) panel.style.maxHeight = `${panel.scrollHeight}px`;
+  });
+});
+
+function expandRefChapter(sectionId) {
+  const toggle = document.getElementById(`${sectionId}-toggle`);
+  if (toggle && toggle.getAttribute('aria-expanded') !== 'true') {
+    setRefChapterExpanded(toggle, true);
+  }
+}
+
+// --- Перекрёстные ссылки на главы справочника --------------------------------
+// Ссылки на главы справочника (из калькулятора и из Содержания) открывают
+// вкладку «Справка», разворачивают целевую свёрнутую главу и прокручивают к
+// ней — якорь сам по себе не сработал бы ни в неактивной вкладке, ни внутри
+// свёрнутого аккордеона.
 document.addEventListener('click', (event) => {
-  const link = event.target.closest('a.ref-link');
+  const link = event.target.closest('a[href^="#ref-"]');
   if (!link) return;
   event.preventDefault();
   const targetId = (link.getAttribute('href') || '').replace('#', '');
   if (!targetId) return;
   switchTab('about');
+  expandRefChapter(targetId);
   requestAnimationFrame(() => {
     document.getElementById(targetId)?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
   });
