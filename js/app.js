@@ -18,6 +18,7 @@ import { topMostSelectedIds } from './treeSelection.js';
 import { buildSchemeLayout } from './schemeLayout.js';
 import { buildSheet } from './schemeSheet.js';
 import { buildSchemePdf } from './exportPdf.js';
+import { buildVectorSchemePdf } from './vectorPdf.js';
 import { buildDxf } from './exportDxf.js';
 import { buildSpecCsv } from './schemeSpec.js';
 import { buildSpecSheets } from './specSheet.js';
@@ -155,9 +156,11 @@ const netVersionsSection = document.getElementById('net-versions-section');
 const exportMenuBtn = document.getElementById('export-menu-btn');
 const exportDropdown = document.getElementById('export-dropdown');
 const exportPdfBtn = document.getElementById('export-pdf-btn');
+const exportPdfVectorBtn = document.getElementById('export-pdf-vector-btn');
 const exportDxfBtn = document.getElementById('export-dxf-btn');
 const exportSpecBtn = document.getElementById('export-spec-btn');
 const exportSpecPdfBtn = document.getElementById('export-spec-pdf-btn');
+const exportSpecPdfVectorBtn = document.getElementById('export-spec-pdf-vector-btn');
 const exportBomBtn = document.getElementById('export-bom-btn');
 const resetNetworkBtn = document.getElementById('reset-network-btn');
 const netToast = document.getElementById('net-toast');
@@ -3336,6 +3339,17 @@ exportPdfBtn.addEventListener('click', () => {
   }
 });
 
+exportPdfVectorBtn.addEventListener('click', async () => {
+  if (!networkTree) return;
+  try {
+    const blob = await buildVectorSchemePdf(buildSchemeSheet());
+    downloadBlob(blob, `${sanitizeFileName(networkTree.name)} (вектор).pdf`);
+    networkErrorMessage.textContent = '';
+  } catch (err) {
+    networkErrorMessage.textContent = `Не удалось построить векторный PDF: ${err.message}`;
+  }
+});
+
 exportDxfBtn.addEventListener('click', () => {
   if (!networkTree) return;
   try {
@@ -3370,6 +3384,21 @@ exportSpecPdfBtn.addEventListener('click', () => {
     networkErrorMessage.textContent = '';
   } catch (err) {
     networkErrorMessage.textContent = `Не удалось построить ведомость PDF: ${err.message}`;
+  }
+});
+
+exportSpecPdfVectorBtn.addEventListener('click', async () => {
+  if (!networkTree) return;
+  try {
+    const sheets = buildSpecSheets(networkTree, {
+      title: networkTree.name,
+      date: formatDateTime(Date.now()),
+    });
+    const blob = await buildVectorSchemePdf(sheets);
+    downloadBlob(blob, `${sanitizeFileName(networkTree.name)} — ведомость (вектор).pdf`);
+    networkErrorMessage.textContent = '';
+  } catch (err) {
+    networkErrorMessage.textContent = `Не удалось построить векторную ведомость PDF: ${err.message}`;
   }
 });
 
