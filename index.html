@@ -905,6 +905,25 @@
                 при той же активной мощности — отсюда требование энергоснабжающих организаций поддерживать
                 cos φ не ниже нормативного значения (см. гл. 12).
               </p>
+              <figure class="ref-diagram">
+                <svg class="ref-diagram-svg" viewBox="0 0 320 200" role="img" aria-labelledby="rd-basics-title rd-basics-desc" focusable="false">
+                  <title id="rd-basics-title">Треугольник мощностей</title>
+                  <desc id="rd-basics-desc">Прямоугольный треугольник: горизонтальный катет P — активная мощность, вертикальный катет Q — реактивная мощность, гипотенуза S — полная мощность, угол φ между P и S.</desc>
+                  <path class="rd-line" d="M250,160 L250,150 L260,150" />
+                  <line class="rd-line" x1="50" y1="160" x2="275" y2="160" />
+                  <polygon class="rd-fill-muted" points="275,160 264,155 264,165" />
+                  <line class="rd-line rd-dash" x1="260" y1="160" x2="260" y2="65" />
+                  <polygon class="rd-fill-muted" points="260,65 254,76 266,76" />
+                  <line class="rd-accent" x1="50" y1="160" x2="260" y2="70" />
+                  <polygon class="rd-fill-accent" points="260,70 253.2,79.4 248.5,68.4" />
+                  <path class="rd-line" d="M78,160 A28,28 0 0,0 75.7,149" />
+                  <text class="rd-text-muted" x="92" y="147">φ</text>
+                  <text class="rd-text" x="160" y="180" text-anchor="middle">P (Вт)</text>
+                  <text class="rd-text" x="272" y="118" text-anchor="start">Q (вар)</text>
+                  <text class="rd-text-accent" x="138" y="105" text-anchor="middle">S (ВА)</text>
+                </svg>
+                <figcaption>Треугольник мощностей: S² = P² + Q², cos φ = P / S.</figcaption>
+              </figure>
             </article>
             <article class="formula-block">
               <h3>Обозначения</h3>
@@ -960,6 +979,42 @@
                   ремонта или замены повреждённого элемента системы электроснабжения — не более 1 суток.
                 </dd>
               </dl>
+              <figure class="ref-diagram">
+                <svg class="ref-diagram-svg" viewBox="0 0 470 175" role="img" aria-labelledby="rd-reliability-title rd-reliability-desc" focusable="false">
+                  <title id="rd-reliability-title">Схемы питания по категориям надёжности</title>
+                  <desc id="rd-reliability-desc">Категория I — два источника через автоматический ввод резерва; категория II — два источника, второй включается персоналом; категория III — один источник.</desc>
+                  <rect class="rd-box" x="15" y="15" width="58" height="26" rx="3" />
+                  <text class="rd-text-sm" x="44" y="32" text-anchor="middle">Ист. 1</text>
+                  <rect class="rd-box" x="85" y="15" width="58" height="26" rx="3" />
+                  <text class="rd-text-sm" x="114" y="32" text-anchor="middle">Ист. 2</text>
+                  <line class="rd-line" x1="44" y1="41" x2="79" y2="70" />
+                  <line class="rd-line" x1="114" y1="41" x2="79" y2="70" />
+                  <rect class="rd-box-accent" x="49" y="70" width="60" height="24" rx="3" />
+                  <text class="rd-text-sm" x="79" y="86" text-anchor="middle">АВР</text>
+                  <line class="rd-line" x1="79" y1="94" x2="79" y2="120" />
+                  <rect class="rd-box" x="49" y="120" width="60" height="26" rx="3" />
+                  <text class="rd-text-sm" x="79" y="137" text-anchor="middle">Нагрузка</text>
+                  <text class="rd-text" x="79" y="166" text-anchor="middle">Категория I</text>
+
+                  <rect class="rd-box" x="180" y="15" width="58" height="26" rx="3" />
+                  <text class="rd-text-sm" x="209" y="32" text-anchor="middle">Ист. 1</text>
+                  <rect class="rd-box" x="250" y="15" width="58" height="26" rx="3" />
+                  <text class="rd-text-sm" x="279" y="32" text-anchor="middle">Ист. 2</text>
+                  <line class="rd-line" x1="209" y1="41" x2="245" y2="120" />
+                  <line class="rd-line rd-dash" x1="279" y1="41" x2="245" y2="120" />
+                  <rect class="rd-box" x="215" y="120" width="60" height="26" rx="3" />
+                  <text class="rd-text-sm" x="245" y="137" text-anchor="middle">Нагрузка</text>
+                  <text class="rd-text" x="245" y="166" text-anchor="middle">Категория II</text>
+
+                  <rect class="rd-box" x="380" y="15" width="70" height="26" rx="3" />
+                  <text class="rd-text-sm" x="415" y="32" text-anchor="middle">Источник</text>
+                  <line class="rd-line" x1="415" y1="41" x2="415" y2="120" />
+                  <rect class="rd-box" x="385" y="120" width="60" height="26" rx="3" />
+                  <text class="rd-text-sm" x="415" y="137" text-anchor="middle">Нагрузка</text>
+                  <text class="rd-text" x="415" y="166" text-anchor="middle">Категория III</text>
+                </svg>
+                <figcaption>Сплошная линия — рабочее питание, штриховая — резерв, включаемый вручную.</figcaption>
+              </figure>
               <p class="note">
                 Калькулятор и конструктор сети не моделируют резервные источники и АВР — они рассчитывают
                 один ввод питания. Если объект требует I или II категории надёжности, схему резервирования
@@ -1005,6 +1060,30 @@
                 электроплит, общественного назначения помещений и т.п.). Приложение не воспроизводит эти
                 таблицы — Kи и Kс вводятся вами по результатам отдельного расчёта или по проектным данным.
               </p>
+              <figure class="ref-diagram">
+                <svg class="ref-diagram-svg" viewBox="0 0 400 235" role="img" aria-labelledby="rd-loads-title rd-loads-desc" focusable="false">
+                  <title id="rd-loads-title">Свёртка нагрузки группы приёмников</title>
+                  <desc id="rd-loads-desc">Три расчётные нагрузки складываются и умножаются на коэффициент одновременности Kс, давая итоговую расчётную нагрузку группы Pр.гр.</desc>
+                  <rect class="rd-box" x="20" y="15" width="80" height="28" rx="3" />
+                  <text class="rd-text-sm" x="60" y="33" text-anchor="middle">Pр1</text>
+                  <rect class="rd-box" x="160" y="15" width="80" height="28" rx="3" />
+                  <text class="rd-text-sm" x="200" y="33" text-anchor="middle">Pр2</text>
+                  <rect class="rd-box" x="300" y="15" width="80" height="28" rx="3" />
+                  <text class="rd-text-sm" x="340" y="33" text-anchor="middle">Pр3</text>
+                  <line class="rd-line" x1="60" y1="43" x2="200" y2="80" />
+                  <line class="rd-line" x1="200" y1="43" x2="200" y2="80" />
+                  <line class="rd-line" x1="340" y1="43" x2="200" y2="80" />
+                  <rect class="rd-box" x="155" y="80" width="90" height="30" rx="3" />
+                  <text class="rd-text-sm" x="200" y="99" text-anchor="middle">Σ Pр.i</text>
+                  <line class="rd-line" x1="200" y1="110" x2="200" y2="140" />
+                  <rect class="rd-box-accent" x="160" y="140" width="80" height="30" rx="3" />
+                  <text class="rd-text-sm" x="200" y="159" text-anchor="middle">× Kс</text>
+                  <line class="rd-line" x1="200" y1="170" x2="200" y2="195" />
+                  <rect class="rd-box" x="155" y="195" width="90" height="30" rx="3" />
+                  <text class="rd-text-sm" x="200" y="214" text-anchor="middle">Pр.гр</text>
+                </svg>
+                <figcaption>Pр.гр = Kс · Σ Pр.i — простая сумма даёт завышенный результат, так как приёмники редко загружены максимально одновременно.</figcaption>
+              </figure>
             </article>
           </div>
         </div>
@@ -1038,6 +1117,26 @@
                 расчёте не учитываются — если они применяются, кратность Kп следует задавать ниже паспортного
                 значения прямого пуска, по данным выбранного устройства.
               </p>
+              <figure class="ref-diagram">
+                <svg class="ref-diagram-svg" viewBox="0 0 380 200" role="img" aria-labelledby="rd-motors-title rd-motors-desc" focusable="false">
+                  <title id="rd-motors-title">Кривая пускового тока двигателя</title>
+                  <desc id="rd-motors-desc">При включении ток скачком поднимается до уровня, кратного номинальному (Iп ≈ Kп·Iном), удерживается на этом уровне в течение времени пуска tп, затем спадает до номинального тока.</desc>
+                  <line class="rd-line" x1="40" y1="170" x2="360" y2="170" />
+                  <polygon class="rd-fill-muted" points="360,170 350,165 350,175" />
+                  <line class="rd-line" x1="40" y1="170" x2="40" y2="15" />
+                  <polygon class="rd-fill-muted" points="40,15 35,25 45,25" />
+                  <line class="rd-line rd-dash" x1="40" y1="45" x2="360" y2="45" />
+                  <line class="rd-line rd-dash" x1="40" y1="130" x2="360" y2="130" />
+                  <path class="rd-accent" d="M40,170 L40,45 L140,70 L140,130 L360,130" />
+                  <line class="rd-line rd-dash" x1="140" y1="130" x2="140" y2="170" />
+                  <text class="rd-text-sm-muted" x="300" y="40">Iп ≈ Kп·Iном</text>
+                  <text class="rd-text-sm-muted" x="300" y="122">Iном</text>
+                  <text class="rd-text-sm-muted" x="140" y="184" text-anchor="middle">tп</text>
+                  <text class="rd-text-sm-muted" x="365" y="174">t</text>
+                  <text class="rd-text-sm-muted" x="30" y="14" text-anchor="end">I</text>
+                </svg>
+                <figcaption>Пусковой ток держится повышенным лишь на время разгона tп, затем падает до номинального — автомат не должен ложно срабатывать в этом интервале.</figcaption>
+              </figure>
             </article>
           </div>
         </div>
@@ -1061,6 +1160,25 @@
                 таблица допустимых токов приведена ниже (см. также пункт «Таблица допустимых токовых
                 нагрузок»).
               </p>
+              <figure class="ref-diagram">
+                <svg class="ref-diagram-svg" viewBox="0 0 380 160" role="img" aria-labelledby="rd-cables-title rd-cables-desc" focusable="false">
+                  <title id="rd-cables-title">Сечение жилы и допустимый ток</title>
+                  <desc id="rd-cables-desc">Три сечения жилы кабеля разного диаметра: чем больше площадь сечения жилы, тем выше длительно допустимый ток.</desc>
+                  <circle class="rd-box" cx="70" cy="70" r="14" />
+                  <circle class="rd-fill-accent" cx="70" cy="70" r="8" />
+                  <text class="rd-text-sm-muted" x="70" y="108" text-anchor="middle">1.5 мм²</text>
+                  <circle class="rd-box" cx="190" cy="70" r="19" />
+                  <circle class="rd-fill-accent" cx="190" cy="70" r="13" />
+                  <text class="rd-text-sm-muted" x="190" y="108" text-anchor="middle">6 мм²</text>
+                  <circle class="rd-box" cx="310" cy="70" r="24" />
+                  <circle class="rd-fill-accent" cx="310" cy="70" r="18" />
+                  <text class="rd-text-sm-muted" x="310" y="108" text-anchor="middle">16 мм²</text>
+                  <line class="rd-line" x1="40" y1="135" x2="345" y2="135" />
+                  <polygon class="rd-fill-muted" points="345,135 336,130 336,140" />
+                  <text class="rd-text-sm-muted" x="190" y="153" text-anchor="middle">допустимый длительный ток растёт с сечением жилы</text>
+                </svg>
+                <figcaption>Закрашенный круг — токопроводящая жила, кольцо — изоляция (масштаб условный).</figcaption>
+              </figure>
             </article>
             <article class="formula-block">
               <h3>По потере напряжения в линии</h3>
@@ -1189,6 +1307,29 @@
                 (автоматы бытового и аналогичного назначения); для промышленных автоматов с регулируемой
                 отсечкой действует ГОСТ Р 50030.2 / IEC 60947-2.
               </p>
+              <figure class="ref-diagram">
+                <svg class="ref-diagram-svg" viewBox="0 0 380 210" role="img" aria-labelledby="rd-breakers-title rd-breakers-desc" focusable="false">
+                  <title id="rd-breakers-title">Времятоковые характеристики B, C, D (упрощённо)</title>
+                  <desc id="rd-breakers-desc">Три кривые время отключения от кратности тока: у характеристики B мгновенное отключение наступает раньше (при меньшей кратности тока), чем у C, а у D — позже всех.</desc>
+                  <line class="rd-line" x1="40" y1="170" x2="360" y2="170" />
+                  <polygon class="rd-fill-muted" points="360,170 350,165 350,175" />
+                  <line class="rd-line" x1="40" y1="170" x2="40" y2="15" />
+                  <polygon class="rd-fill-muted" points="40,15 35,25 45,25" />
+                  <path class="rd-line rd-dash" d="M50,40 C90,55 110,72 130,92 L130,160 L360,162" />
+                  <path class="rd-accent" d="M50,42 C110,60 150,85 200,100 L200,160 L360,162" />
+                  <path class="rd-stroke-danger" d="M50,44 C130,65 200,95 290,115 L290,160 L360,162" />
+                  <text class="rd-text-sm-muted" x="134" y="100">B</text>
+                  <text class="rd-text-sm-muted" x="204" y="108">C</text>
+                  <text class="rd-text-sm-muted" x="294" y="123">D</text>
+                  <text class="rd-text-sm-muted" x="40" y="184" text-anchor="middle">1×</text>
+                  <text class="rd-text-sm-muted" x="130" y="184" text-anchor="middle">5×</text>
+                  <text class="rd-text-sm-muted" x="200" y="184" text-anchor="middle">10×</text>
+                  <text class="rd-text-sm-muted" x="290" y="184" text-anchor="middle">20×</text>
+                  <text class="rd-text-sm-muted" x="365" y="174">I/Iₙ</text>
+                  <text class="rd-text-sm-muted" x="30" y="14" text-anchor="end">t</text>
+                </svg>
+                <figcaption>Чем «острее» характеристика (B → C → D), тем при большей кратности тока срабатывает мгновенная (электромагнитная) отсечка.</figcaption>
+              </figure>
             </article>
             <article class="formula-block">
               <h3>Отключающая способность (Icu / Ics)</h3>
@@ -1231,6 +1372,35 @@
                 «Селективные» УЗО типа S — с задержкой срабатывания, для установки на вводе, выше обычных УЗО
                 групповых линий, чтобы при утечке в одной группе отключалась только она, а не весь ввод.
               </p>
+              <figure class="ref-diagram">
+                <svg class="ref-diagram-svg" viewBox="0 0 380 210" role="img" aria-labelledby="rd-rcd-title rd-rcd-desc" focusable="false">
+                  <title id="rd-rcd-title">Принцип действия УЗО</title>
+                  <desc id="rd-rcd-desc">Фазный и нулевой проводники проходят через общий трансформатор тока. При утечке тока на землю токи в проводниках перестают быть равны, разница улавливается обмоткой и подаётся на расцепитель, который размыкает контакты.</desc>
+                  <text class="rd-text-sm-muted" x="8" y="47">L</text>
+                  <text class="rd-text-sm-muted" x="8" y="103">N</text>
+                  <line class="rd-line" x1="20" y1="50" x2="55" y2="50" />
+                  <line class="rd-line" x1="20" y1="100" x2="55" y2="100" />
+                  <rect class="rd-box" x="55" y="30" width="40" height="80" rx="3" />
+                  <text class="rd-text-sm" x="75" y="74" text-anchor="middle">K</text>
+                  <line class="rd-line" x1="95" y1="50" x2="290" y2="50" />
+                  <line class="rd-line" x1="95" y1="100" x2="290" y2="100" />
+                  <ellipse class="rd-box" cx="160" cy="75" rx="20" ry="45" />
+                  <path class="rd-line" d="M160,120 q6,5 0,10 q-6,5 0,10 q6,5 0,10" />
+                  <rect class="rd-box-accent" x="135" y="152" width="50" height="24" rx="3" />
+                  <text class="rd-text-sm" x="160" y="168" text-anchor="middle">Расц.</text>
+                  <path class="rd-line rd-dash" d="M135,164 L75,164 L75,110" />
+                  <circle class="rd-fill-accent" cx="270" cy="50" r="3" />
+                  <path class="rd-accent rd-dash" d="M270,50 L270,165" />
+                  <polygon class="rd-fill-accent" points="270,168 265,158 275,158" />
+                  <text class="rd-text-sm-muted" x="278" y="120">ΔI</text>
+                  <line class="rd-line" x1="258" y1="178" x2="282" y2="178" />
+                  <line class="rd-line" x1="262" y1="184" x2="278" y2="184" />
+                  <line class="rd-line" x1="266" y1="190" x2="274" y2="190" />
+                  <rect class="rd-box" x="290" y="35" width="65" height="80" rx="3" />
+                  <text class="rd-text-sm" x="322" y="78" text-anchor="middle">Нагрузка</text>
+                </svg>
+                <figcaption>Трансформатор тока сравнивает токи в L и N; при утечке ΔI на землю расцепитель размыкает контакты K на обоих полюсах.</figcaption>
+              </figure>
             </article>
             <article class="formula-block">
               <h3>Дифференциальные автоматы (АВДТ)</h3>
@@ -1270,6 +1440,29 @@
                 не гарантирована; при равном или меньшем номинале — не обеспечена. Это упрощённая прикидка без
                 использования времятоковых характеристик конкретных производителей.
               </p>
+              <figure class="ref-diagram">
+                <svg class="ref-diagram-svg" viewBox="0 0 380 200" role="img" aria-labelledby="rd-selectivity-title rd-selectivity-desc" focusable="false">
+                  <title id="rd-selectivity-title">Селективность при коротком замыкании</title>
+                  <desc id="rd-selectivity-desc">Короткое замыкание на одной отходящей линии отключает только её автомат Q2 — вышестоящий Q1 и соседний Q3 остаются включёнными.</desc>
+                  <rect class="rd-box" x="150" y="20" width="90" height="30" rx="3" />
+                  <text class="rd-text-sm" x="195" y="40" text-anchor="middle">Q1 63 А</text>
+                  <line class="rd-line" x1="195" y1="50" x2="105" y2="90" />
+                  <line class="rd-line" x1="195" y1="50" x2="290" y2="90" />
+                  <rect class="rd-box-danger" x="65" y="90" width="80" height="28" rx="3" />
+                  <text class="rd-text-sm" x="105" y="108" text-anchor="middle">Q2 25 А</text>
+                  <text class="rd-text-sm-muted" x="105" y="129" text-anchor="middle">отключился</text>
+                  <rect class="rd-box" x="250" y="90" width="80" height="28" rx="3" />
+                  <text class="rd-text-sm" x="290" y="108" text-anchor="middle">Q3 16 А</text>
+                  <text class="rd-text-sm-muted" x="290" y="129" text-anchor="middle">в работе</text>
+                  <line class="rd-line rd-stroke-danger" x1="105" y1="132" x2="105" y2="160" />
+                  <text class="rd-text-accent" x="118" y="150">КЗ</text>
+                  <polygon class="rd-fill-danger" points="112,155 98,172 106,172 96,190 114,170 104,170" />
+                  <line class="rd-line" x1="290" y1="132" x2="290" y2="160" />
+                  <rect class="rd-box" x="260" y="160" width="60" height="26" rx="3" />
+                  <text class="rd-text-sm" x="290" y="177" text-anchor="middle">Нагрузка</text>
+                </svg>
+                <figcaption>Селективность обеспечена: 63 / 25 ≈ 2.5 ≥ 2 — при КЗ на линии Q2 отключается только она, Q1 и Q3 остаются включены.</figcaption>
+              </figure>
             </article>
             <article class="formula-block">
               <h3>Временная селективность и полная/частичная селективность</h3>
@@ -1312,6 +1505,26 @@
                 отключающей способности автоматов Icu ≥ I<sub>кз</sub> (гл. 6) и проверки времени
                 автоматического отключения при пробое изоляции на корпус (далее).
               </p>
+              <figure class="ref-diagram">
+                <svg class="ref-diagram-svg" viewBox="0 0 300 155" role="img" aria-labelledby="rd-shortcircuit-title rd-shortcircuit-desc" focusable="false">
+                  <title id="rd-shortcircuit-title">Петля тока короткого замыкания</title>
+                  <desc id="rd-shortcircuit-desc">Полное сопротивление петли КЗ складывается из сопротивления источника (трансформатора) Zт и сопротивления кабеля Zк до точки замыкания.</desc>
+                  <rect class="rd-box" x="20" y="45" width="100" height="40" rx="3" />
+                  <text class="rd-text-sm" x="70" y="63" text-anchor="middle">Источник</text>
+                  <text class="rd-text-sm-muted" x="70" y="77" text-anchor="middle">(Zт)</text>
+                  <line class="rd-line" x1="120" y1="65" x2="150" y2="65" />
+                  <polyline class="rd-line" points="150,65 158,50 166,80 174,50 182,80 190,65" fill="none" />
+                  <text class="rd-text-muted" x="170" y="30" text-anchor="middle">Кабель (Zк)</text>
+                  <line class="rd-line" x1="190" y1="65" x2="243" y2="65" />
+                  <polygon class="rd-fill-danger" points="262,50 248,67 256,67 246,85 264,65 254,65" />
+                  <text class="rd-text-accent" x="255" y="98" text-anchor="middle">точка КЗ</text>
+                  <line class="rd-line" x1="20" y1="115" x2="255" y2="115" />
+                  <line class="rd-line" x1="20" y1="109" x2="20" y2="121" />
+                  <line class="rd-line" x1="255" y1="109" x2="255" y2="121" />
+                  <text class="rd-text" x="137" y="140" text-anchor="middle">Zп = Zт + Zк</text>
+                </svg>
+                <figcaption>Ток КЗ в точке замыкания определяется полным сопротивлением петли: источник (трансформатор) + кабель до точки замыкания.</figcaption>
+              </figure>
             </article>
             <article class="formula-block">
               <h3>Время автоматического отключения при пробое на корпус (система TN)</h3>
@@ -1429,6 +1642,122 @@
                 <dd>Нейтраль источника изолирована от земли или заземлена через большое сопротивление; открытые проводящие части заземлены. Применяется там, где недопустимо отключение при первом единичном замыкании на землю (операционные, непрерывные технологические процессы) — требует устройства контроля изоляции (УКИ).</dd>
               </dl>
               <p class="note">Нормативная основа — ПУЭ-7 гл. 1.7, серия ГОСТ Р 50571.</p>
+              <div class="ref-diagram-grid">
+                <figure class="ref-diagram">
+                  <svg class="ref-diagram-svg" viewBox="0 0 200 100" role="img" aria-labelledby="rd-tnc-title rd-tnc-desc" focusable="false">
+                    <title id="rd-tnc-title">Система TN-C</title>
+                    <desc id="rd-tnc-desc">Рабочий и защитный проводники объединены в один PEN-проводник на всём протяжении от источника до потребителя, заземление выполнено только у источника.</desc>
+                    <rect class="rd-box" x="8" y="25" width="56" height="50" rx="3" />
+                    <text class="rd-text-sm" x="36" y="54" text-anchor="middle">ИП</text>
+                    <rect class="rd-box" x="136" y="25" width="56" height="50" rx="3" />
+                    <text class="rd-text-sm" x="164" y="54" text-anchor="middle">Нагрузка</text>
+                    <line class="rd-line" x1="64" y1="37" x2="136" y2="37" />
+                    <text class="rd-text-sm-muted" x="100" y="30" text-anchor="middle">L1, L2, L3</text>
+                    <line class="rd-line" x1="64" y1="62" x2="136" y2="62" />
+                    <text class="rd-text-sm" x="100" y="78" text-anchor="middle">PEN</text>
+                    <line class="rd-line" x1="74" y1="62" x2="74" y2="72" />
+                    <line class="rd-line" x1="65" y1="72" x2="83" y2="72" />
+                    <line class="rd-line" x1="68" y1="76" x2="80" y2="76" />
+                    <line class="rd-line" x1="71" y1="80" x2="77" y2="80" />
+                  </svg>
+                  <figcaption>TN-C: N и PE объединены в общий PEN на всём пути — заземление только у источника.</figcaption>
+                </figure>
+                <figure class="ref-diagram">
+                  <svg class="ref-diagram-svg" viewBox="0 0 200 110" role="img" aria-labelledby="rd-tns-title rd-tns-desc" focusable="false">
+                    <title id="rd-tns-title">Система TN-S</title>
+                    <desc id="rd-tns-desc">Рабочий (N) и защитный (PE) проводники разделены на всём протяжении от источника, заземление выполнено только у источника.</desc>
+                    <rect class="rd-box" x="8" y="15" width="56" height="80" rx="3" />
+                    <text class="rd-text-sm" x="36" y="59" text-anchor="middle">ИП</text>
+                    <rect class="rd-box" x="136" y="15" width="56" height="80" rx="3" />
+                    <text class="rd-text-sm" x="164" y="59" text-anchor="middle">Нагрузка</text>
+                    <line class="rd-line" x1="64" y1="30" x2="136" y2="30" />
+                    <text class="rd-text-sm-muted" x="100" y="26" text-anchor="middle">L1, L2, L3</text>
+                    <line class="rd-line" x1="64" y1="55" x2="136" y2="55" />
+                    <text class="rd-text-sm" x="100" y="51" text-anchor="middle">N</text>
+                    <line class="rd-line" x1="64" y1="80" x2="136" y2="80" />
+                    <text class="rd-text-sm" x="100" y="76" text-anchor="middle">PE</text>
+                    <line class="rd-line" x1="76" y1="80" x2="76" y2="90" />
+                    <line class="rd-line" x1="67" y1="90" x2="85" y2="90" />
+                    <line class="rd-line" x1="70" y1="94" x2="82" y2="94" />
+                    <line class="rd-line" x1="73" y1="98" x2="79" y2="98" />
+                  </svg>
+                  <figcaption>TN-S: N и PE разделены от источника до потребителя — заземление только у источника, наиболее безопасный вариант TN.</figcaption>
+                </figure>
+                <figure class="ref-diagram">
+                  <svg class="ref-diagram-svg" viewBox="0 0 200 110" role="img" aria-labelledby="rd-tncs-title rd-tncs-desc" focusable="false">
+                    <title id="rd-tncs-title">Система TN-C-S</title>
+                    <desc id="rd-tncs-desc">PEN-проводник от источника до вводного устройства, далее разделяется на N и PE; повторное заземление выполняется в точке разделения.</desc>
+                    <rect class="rd-box" x="8" y="15" width="56" height="80" rx="3" />
+                    <text class="rd-text-sm" x="36" y="59" text-anchor="middle">ИП</text>
+                    <rect class="rd-box" x="136" y="15" width="56" height="80" rx="3" />
+                    <text class="rd-text-sm" x="164" y="59" text-anchor="middle">Нагрузка</text>
+                    <line class="rd-line" x1="64" y1="30" x2="136" y2="30" />
+                    <text class="rd-text-sm-muted" x="100" y="26" text-anchor="middle">L1, L2, L3</text>
+                    <line class="rd-line" x1="64" y1="55" x2="100" y2="55" />
+                    <text class="rd-text-sm" x="82" y="51" text-anchor="middle">PEN</text>
+                    <line class="rd-line" x1="100" y1="55" x2="136" y2="55" />
+                    <text class="rd-text-sm" x="118" y="51" text-anchor="middle">N</text>
+                    <line class="rd-line" x1="100" y1="55" x2="100" y2="80" />
+                    <line class="rd-line" x1="100" y1="80" x2="136" y2="80" />
+                    <text class="rd-text-sm" x="118" y="76" text-anchor="middle">PE</text>
+                    <circle class="rd-fill-accent" cx="100" cy="55" r="2.5" />
+                    <text class="rd-text-sm-muted" x="100" y="17" text-anchor="middle">ВУ</text>
+                    <line class="rd-line" x1="100" y1="80" x2="100" y2="90" />
+                    <line class="rd-line" x1="91" y1="90" x2="109" y2="90" />
+                    <line class="rd-line" x1="94" y1="94" x2="106" y2="94" />
+                    <line class="rd-line" x1="97" y1="98" x2="103" y2="98" />
+                  </svg>
+                  <figcaption>TN-C-S: PEN от источника до вводного устройства (ВУ), далее раздельные N и PE — повторное заземление в точке разделения.</figcaption>
+                </figure>
+                <figure class="ref-diagram">
+                  <svg class="ref-diagram-svg" viewBox="0 0 200 100" role="img" aria-labelledby="rd-tt-title rd-tt-desc" focusable="false">
+                    <title id="rd-tt-title">Система TT</title>
+                    <desc id="rd-tt-desc">Открытые проводящие части потребителя заземлены через собственный заземляющий электрод, электрически не связанный с заземлением источника.</desc>
+                    <rect class="rd-box" x="8" y="15" width="56" height="60" rx="3" />
+                    <text class="rd-text-sm" x="36" y="49" text-anchor="middle">ИП</text>
+                    <rect class="rd-box" x="136" y="15" width="56" height="60" rx="3" />
+                    <text class="rd-text-sm" x="164" y="49" text-anchor="middle">Нагрузка</text>
+                    <line class="rd-line" x1="64" y1="30" x2="136" y2="30" />
+                    <text class="rd-text-sm-muted" x="100" y="26" text-anchor="middle">L1, L2, L3</text>
+                    <line class="rd-line" x1="64" y1="55" x2="136" y2="55" />
+                    <text class="rd-text-sm" x="100" y="51" text-anchor="middle">N</text>
+                    <line class="rd-line" x1="72" y1="55" x2="72" y2="65" />
+                    <line class="rd-line" x1="64" y1="65" x2="80" y2="65" />
+                    <line class="rd-line" x1="67" y1="69" x2="77" y2="69" />
+                    <line class="rd-line" x1="70" y1="73" x2="74" y2="73" />
+                    <line class="rd-line" x1="164" y1="75" x2="164" y2="83" />
+                    <line class="rd-line" x1="156" y1="83" x2="172" y2="83" />
+                    <line class="rd-line" x1="159" y1="87" x2="169" y2="87" />
+                    <line class="rd-line" x1="162" y1="91" x2="166" y2="91" />
+                  </svg>
+                  <figcaption>TT: заземление источника и отдельный, не связанный с ним электрод у потребителя — требует обязательного применения УЗО.</figcaption>
+                </figure>
+                <figure class="ref-diagram">
+                  <svg class="ref-diagram-svg" viewBox="0 0 200 100" role="img" aria-labelledby="rd-it-title rd-it-desc" focusable="false">
+                    <title id="rd-it-title">Система IT</title>
+                    <desc id="rd-it-desc">Нейтраль источника изолирована от земли или заземлена через большое сопротивление; открытые проводящие части потребителя заземлены локально.</desc>
+                    <rect class="rd-box" x="8" y="15" width="56" height="60" rx="3" />
+                    <text class="rd-text-sm" x="36" y="49" text-anchor="middle">ИП</text>
+                    <rect class="rd-box" x="136" y="15" width="56" height="60" rx="3" />
+                    <text class="rd-text-sm" x="164" y="49" text-anchor="middle">Нагрузка</text>
+                    <line class="rd-line" x1="64" y1="30" x2="136" y2="30" />
+                    <text class="rd-text-sm-muted" x="100" y="26" text-anchor="middle">L1, L2, L3</text>
+                    <line class="rd-line" x1="64" y1="55" x2="136" y2="55" />
+                    <text class="rd-text-sm" x="100" y="51" text-anchor="middle">N</text>
+                    <polyline class="rd-line" points="72,55 67,59 77,63 67,67 72,71" fill="none" />
+                    <text class="rd-text-sm-muted" x="84" y="65" text-anchor="middle">Zn</text>
+                    <line class="rd-line" x1="72" y1="71" x2="72" y2="76" />
+                    <line class="rd-line" x1="64" y1="76" x2="80" y2="76" />
+                    <line class="rd-line" x1="67" y1="80" x2="77" y2="80" />
+                    <line class="rd-line" x1="70" y1="84" x2="74" y2="84" />
+                    <line class="rd-line" x1="164" y1="75" x2="164" y2="83" />
+                    <line class="rd-line" x1="156" y1="83" x2="172" y2="83" />
+                    <line class="rd-line" x1="159" y1="87" x2="169" y2="87" />
+                    <line class="rd-line" x1="162" y1="91" x2="166" y2="91" />
+                  </svg>
+                  <figcaption>IT: нейтраль источника изолирована (или через большое сопротивление Zn), потребитель заземлён локально — первое замыкание на землю не отключает питание.</figcaption>
+                </figure>
+              </div>
             </article>
             <article class="formula-block">
               <h3>Сечение защитного (PE) и совмещённого (PEN) проводника</h3>
@@ -1475,6 +1804,26 @@
                 чувствительного оборудования. Расчёт молниезащиты и подбор УЗИП в калькулятор и конструктор
                 сети не входят.
               </p>
+              <figure class="ref-diagram">
+                <svg class="ref-diagram-svg" viewBox="0 0 380 110" role="img" aria-labelledby="rd-lightning-title rd-lightning-desc" focusable="false">
+                  <title id="rd-lightning-title">Каскад УЗИП по классам I, II, III</title>
+                  <desc id="rd-lightning-desc">Прямой удар молнии приходит на вводной щит с УЗИП класса I, затем каскад продолжается УЗИП класса II на распределительном щите и УЗИП класса III у оборудования, снижая остаточное перенапряжение на каждой ступени.</desc>
+                  <polygon class="rd-fill-danger" points="72,5 58,22 66,22 56,40 74,20 64,20" />
+                  <line class="rd-line" x1="65" y1="40" x2="65" y2="50" />
+                  <rect class="rd-box" x="20" y="50" width="90" height="40" rx="3" />
+                  <text class="rd-text-sm" x="65" y="66" text-anchor="middle">ВРУ</text>
+                  <text class="rd-text-sm-muted" x="65" y="81" text-anchor="middle">УЗИП кл. I</text>
+                  <line class="rd-line" x1="110" y1="70" x2="150" y2="70" />
+                  <rect class="rd-box" x="150" y="50" width="90" height="40" rx="3" />
+                  <text class="rd-text-sm" x="195" y="66" text-anchor="middle">Щит</text>
+                  <text class="rd-text-sm-muted" x="195" y="81" text-anchor="middle">УЗИП кл. II</text>
+                  <line class="rd-line" x1="240" y1="70" x2="280" y2="70" />
+                  <rect class="rd-box" x="280" y="50" width="80" height="40" rx="3" />
+                  <text class="rd-text-sm" x="320" y="66" text-anchor="middle">Оборуд.</text>
+                  <text class="rd-text-sm-muted" x="320" y="81" text-anchor="middle">УЗИП кл. III</text>
+                </svg>
+                <figcaption>Каскад УЗИП: класс I на вводе принимает основной импульс, классы II и III на следующих ступенях снижают остаточное перенапряжение до уровня, безопасного для оборудования.</figcaption>
+              </figure>
             </article>
           </div>
         </div>
@@ -1510,6 +1859,27 @@
                 уменьшает потери и нагрев кабелей и трансформаторов и позволяет избежать штрафных санкций за
                 низкий cos φ. Подбор компенсирующих устройств в данном приложении не реализован.
               </p>
+              <figure class="ref-diagram">
+                <svg class="ref-diagram-svg" viewBox="0 0 320 200" role="img" aria-labelledby="rd-quality-title rd-quality-desc" focusable="false">
+                  <title id="rd-quality-title">Компенсация реактивной мощности</title>
+                  <desc id="rd-quality-desc">Два треугольника мощностей с общим катетом P: до компенсации — больший угол φ1 и большая полная мощность S1, после установки батареи конденсаторов — меньший угол φ2 и меньшая S2.</desc>
+                  <line class="rd-line" x1="50" y1="160" x2="270" y2="160" />
+                  <text class="rd-text" x="160" y="180" text-anchor="middle">P (Вт)</text>
+                  <line class="rd-line" x1="50" y1="160" x2="255" y2="65" />
+                  <text class="rd-text-muted" x="225" y="72">S1</text>
+                  <line class="rd-accent" x1="50" y1="160" x2="255" y2="120" />
+                  <text class="rd-text-accent" x="225" y="127">S2</text>
+                  <path class="rd-line" d="M90,160 A40,40 0 0,0 86.3,143.2" />
+                  <text class="rd-text-muted" x="98" y="152">φ1</text>
+                  <path class="rd-line rd-accent" d="M75,160 A25,25 0 0,0 74.5,155.2" />
+                  <text class="rd-text-accent" x="68" y="150">φ2</text>
+                  <line class="rd-line rd-dash" x1="248" y1="65" x2="262" y2="65" />
+                  <line class="rd-line rd-dash" x1="248" y1="120" x2="262" y2="120" />
+                  <line class="rd-line rd-dash" x1="255" y1="65" x2="255" y2="120" />
+                  <text class="rd-text-accent" x="266" y="96">Qк</text>
+                </svg>
+                <figcaption>До компенсации — угол φ1 и реактивная мощность Q1 больше (S1 больше при том же P). Батарея конденсаторов Qк уменьшает угол до φ2, снижая S2 и ток в питающей сети.</figcaption>
+              </figure>
             </article>
           </div>
         </div>
@@ -1534,6 +1904,45 @@
                 применяет калькулятор и конструктор сети (см. гл. 5). Полные таблицы коэффициентов с учётом
                 температуры окружающей среды и реальных условий — ПУЭ-7 гл. 1.3.
               </p>
+              <div class="ref-diagram-grid">
+                <figure class="ref-diagram">
+                  <svg class="ref-diagram-svg" viewBox="0 0 120 120" role="img" aria-labelledby="rd-install-air-title rd-install-air-desc" focusable="false">
+                    <title id="rd-install-air-title">Открытая прокладка в воздухе</title>
+                    <desc id="rd-install-air-desc">Одиночный кабель в свободном воздухе с потоком воздуха со всех сторон обеспечивает наилучший теплоотвод.</desc>
+                    <circle class="rd-box-accent" cx="60" cy="60" r="20" />
+                    <line class="rd-line" x1="60" y1="32" x2="60" y2="14" />
+                    <polygon class="rd-fill-muted" points="60,8 55,18 65,18" />
+                    <line class="rd-line" x1="60" y1="88" x2="60" y2="106" />
+                    <polygon class="rd-fill-muted" points="60,112 55,102 65,102" />
+                    <line class="rd-line" x1="32" y1="60" x2="14" y2="60" />
+                    <polygon class="rd-fill-muted" points="8,60 18,55 18,65" />
+                    <line class="rd-line" x1="88" y1="60" x2="106" y2="60" />
+                    <polygon class="rd-fill-muted" points="112,60 102,55 102,65" />
+                  </svg>
+                  <figcaption>Открыто в воздухе — наилучший теплоотвод, наибольший допустимый ток.</figcaption>
+                </figure>
+                <figure class="ref-diagram">
+                  <svg class="ref-diagram-svg" viewBox="0 0 120 120" role="img" aria-labelledby="rd-install-conduit-title rd-install-conduit-desc" focusable="false">
+                    <title id="rd-install-conduit-title">Прокладка в трубе или коробе</title>
+                    <desc id="rd-install-conduit-desc">Кабель внутри трубы, кабельного короба или штукатурки — теплообмен затруднён стенками канала.</desc>
+                    <rect class="rd-box" x="20" y="20" width="80" height="80" rx="8" />
+                    <circle class="rd-box-accent" cx="60" cy="60" r="16" />
+                  </svg>
+                  <figcaption>В трубе, коробе или штукатурке — затруднённый теплообмен, ток снижается поправочным коэффициентом.</figcaption>
+                </figure>
+                <figure class="ref-diagram">
+                  <svg class="ref-diagram-svg" viewBox="0 0 140 110" role="img" aria-labelledby="rd-install-bundle-title rd-install-bundle-desc" focusable="false">
+                    <title id="rd-install-bundle-title">Несколько кабелей на лотке</title>
+                    <desc id="rd-install-bundle-desc">Несколько кабелей, проложенных рядом на лотке или в пучке, взаимно подогревают друг друга.</desc>
+                    <polyline class="rd-line" points="10,30 10,90 130,90 130,30" fill="none" />
+                    <circle class="rd-box-accent" cx="24" cy="76" r="14" />
+                    <circle class="rd-box-accent" cx="52" cy="76" r="14" />
+                    <circle class="rd-box-accent" cx="80" cy="76" r="14" />
+                    <circle class="rd-box-accent" cx="108" cy="76" r="14" />
+                  </svg>
+                  <figcaption>Несколько кабелей рядом на лотке или в пучке — взаимный подогрев, ток снижается коэффициентом числа кабелей.</figcaption>
+                </figure>
+              </div>
             </article>
             <article class="formula-block">
               <h3>Пожарная безопасность кабельных линий</h3>
@@ -1580,6 +1989,36 @@
                 ГОСТ 2.755, обозначения силового электрооборудования и сетей на чертежах планов — по
                 ГОСТ 21.614.
               </p>
+              <figure class="ref-diagram">
+                <svg class="ref-diagram-svg" viewBox="0 0 320 195" role="img" aria-labelledby="rd-docs-title rd-docs-desc" focusable="false">
+                  <title id="rd-docs-title">Фрагмент однолинейной схемы</title>
+                  <desc id="rd-docs-desc">От сети через вводной автомат QF1 питание подаётся на шину, от которой через автоматы QF2 и QF3 отходят две линии к нагрузкам с указанием марки и сечения кабеля.</desc>
+                  <text class="rd-text-sm-muted" x="160" y="14" text-anchor="middle">Сеть</text>
+                  <line class="rd-line" x1="160" y1="18" x2="160" y2="40" />
+                  <rect class="rd-box" x="152" y="40" width="16" height="24" rx="2" />
+                  <line class="rd-line" x1="152" y1="40" x2="168" y2="64" />
+                  <text class="rd-text-sm" x="182" y="56" text-anchor="start">QF1</text>
+                  <line class="rd-line" x1="160" y1="64" x2="160" y2="85" />
+                  <line class="rd-accent" x1="70" y1="85" x2="250" y2="85" />
+                  <line class="rd-line" x1="110" y1="85" x2="110" y2="105" />
+                  <rect class="rd-box" x="102" y="105" width="16" height="24" rx="2" />
+                  <line class="rd-line" x1="102" y1="105" x2="118" y2="129" />
+                  <text class="rd-text-sm" x="122" y="121" text-anchor="start">QF2</text>
+                  <line class="rd-line" x1="110" y1="129" x2="110" y2="150" />
+                  <text class="rd-text-sm-muted" x="122" y="144" text-anchor="start">ВВГ 3×2.5</text>
+                  <rect class="rd-box" x="80" y="150" width="60" height="30" rx="3" />
+                  <text class="rd-text-sm" x="110" y="169" text-anchor="middle">Розетки</text>
+                  <line class="rd-line" x1="210" y1="85" x2="210" y2="105" />
+                  <rect class="rd-box" x="202" y="105" width="16" height="24" rx="2" />
+                  <line class="rd-line" x1="202" y1="105" x2="218" y2="129" />
+                  <text class="rd-text-sm" x="222" y="121" text-anchor="start">QF3</text>
+                  <line class="rd-line" x1="210" y1="129" x2="210" y2="150" />
+                  <text class="rd-text-sm-muted" x="222" y="144" text-anchor="start">ВВГ 3×4</text>
+                  <rect class="rd-box" x="180" y="150" width="60" height="30" rx="3" />
+                  <text class="rd-text-sm" x="210" y="169" text-anchor="middle">Освещение</text>
+                </svg>
+                <figcaption>Фрагмент однолинейной схемы (обозначения упрощены): ввод через QF1, шина, отходящие линии через QF2/QF3 с указанием марки и сечения кабеля — именно такую схему строит конструктор сети автоматически.</figcaption>
+              </figure>
             </article>
             <article class="formula-block">
               <h3>Что входит в полный проект электроснабжения, помимо этого приложения</h3>
@@ -1609,6 +2048,22 @@
         <div class="ref-chapter-panel" id="ref-glossary-panel" role="region" aria-labelledby="ref-glossary-toggle" hidden>
           <div class="ref-chapter-panel-inner">
             <article class="formula-block">
+              <figure class="ref-diagram">
+                <svg class="ref-diagram-svg" viewBox="0 0 120 90" role="img" aria-labelledby="rd-glossary-title rd-glossary-desc" focusable="false">
+                  <title id="rd-glossary-title">Глоссарий терминов</title>
+                  <desc id="rd-glossary-desc">Список терминов и определений с поиском по ключевым словам.</desc>
+                  <rect class="rd-box" x="15" y="10" width="90" height="70" rx="6" />
+                  <circle class="rd-fill-accent" cx="30" cy="26" r="3" />
+                  <line class="rd-line" x1="40" y1="26" x2="95" y2="26" />
+                  <circle class="rd-fill-accent" cx="30" cy="42" r="3" />
+                  <line class="rd-line" x1="40" y1="42" x2="95" y2="42" />
+                  <circle class="rd-fill-accent" cx="30" cy="58" r="3" />
+                  <line class="rd-line" x1="40" y1="58" x2="95" y2="58" />
+                  <circle class="rd-fill-accent" cx="30" cy="74" r="3" />
+                  <line class="rd-line" x1="40" y1="74" x2="95" y2="74" />
+                </svg>
+                <figcaption>Глоссарий — краткие определения терминов и единиц измерения, используемых в расчётах, с поиском по ключевым словам.</figcaption>
+              </figure>
               <div class="field glossary-search">
                 <label for="glossary-search">Поиск по глоссарию</label>
                 <input type="search" id="glossary-search" placeholder="Например: реактивная, селективность, Icu…" autocomplete="off" />
@@ -1679,6 +2134,21 @@
         <div class="ref-chapter-panel" id="ref-standards-panel" role="region" aria-labelledby="ref-standards-toggle" hidden>
           <div class="ref-chapter-panel-inner">
             <article class="formula-block">
+              <figure class="ref-diagram">
+                <svg class="ref-diagram-svg" viewBox="0 0 120 90" role="img" aria-labelledby="rd-standards-title rd-standards-desc" focusable="false">
+                  <title id="rd-standards-title">Нормативные документы</title>
+                  <desc id="rd-standards-desc">Документ с отмеченными пунктами, символизирующий перечень нормативных требований.</desc>
+                  <rect class="rd-box" x="25" y="8" width="70" height="78" rx="4" />
+                  <line class="rd-line" x1="36" y1="20" x2="84" y2="20" />
+                  <path class="rd-accent" d="M36,34 L40,39 L49,28" />
+                  <line class="rd-line" x1="54" y1="34" x2="88" y2="34" />
+                  <path class="rd-accent" d="M36,54 L40,59 L49,48" />
+                  <line class="rd-line" x1="54" y1="54" x2="88" y2="54" />
+                  <path class="rd-accent" d="M36,74 L40,79 L49,68" />
+                  <line class="rd-line" x1="54" y1="74" x2="88" y2="74" />
+                </svg>
+                <figcaption>Нормативные документы — ПУЭ, ГОСТ и СП, на основании которых выполнены формулы и проверки приложения.</figcaption>
+              </figure>
               <dl>
                 <dt>ПУЭ (Правила устройства электроустановок), 7-е издание</dt>
                 <dd>Основной нормативный документ: гл. 1.2 — категории надёжности, гл. 1.3 — выбор проводников по нагреву и потере напряжения, гл. 1.7 — заземление и защитные меры электробезопасности, гл. 1.9 — изоляция, гл. 2.1/2.3/2.4 — кабельные и воздушные линии, гл. 7.1 — электроустановки жилых и общественных зданий.</dd>

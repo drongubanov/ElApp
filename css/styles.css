@@ -2433,7 +2433,7 @@ textarea:focus {
 }
 
 /* Плавное раскрытие по высоте: max-height анимируется через инлайн-стиль,
-   выставляемый в JS (toggleRefChapter в app.js) по фактической высоте
+   выставляемый в JS (setRefChapterExpanded в app.js) по фактической высоте
    содержимого — у глав разный объём текста и формул, фиксированное значение
    не подошло бы всем. До первого раскрытия и после сворачивания панель
    получает [hidden], чтобы её содержимое не попадало в таб-порядок и
@@ -2453,6 +2453,139 @@ textarea:focus {
 
 .ref-table-wrapper {
   overflow-x: auto;
+}
+
+/* Векторные схемы в главах справочника. SVG встроены прямо в HTML и используют
+   цвета через переменные темы (currentColor задаётся классами ниже), поэтому
+   автоматически перекрашиваются при переключении тёмной/светлой/печатной темы
+   — отдельной картинки для каждой темы не требуется. width:100% + height:auto
+   на самом SVG при заданном viewBox делает схему адаптивной: она масштабируется
+   по ширине контейнера на любом экране, сохраняя пропорции. */
+.ref-diagram {
+  margin: var(--space-3) 0 var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.ref-diagram-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.ref-diagram figcaption {
+  margin-top: var(--space-2);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+/* Несколько небольших схем в один ряд (например, системы заземления TN/TT/IT) —
+   переносятся в один столбец на узких экранах сами, без media-запроса. */
+.ref-diagram-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+}
+
+.ref-diagram-grid .ref-diagram {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ref-diagram-grid .ref-diagram-svg {
+  max-width: none;
+}
+
+.rd-line {
+  fill: none;
+  stroke: var(--color-text-muted);
+  stroke-width: 2;
+}
+
+.rd-accent {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 2;
+}
+
+.rd-dash {
+  stroke-dasharray: 5 4;
+}
+
+.rd-box {
+  fill: var(--color-surface);
+  stroke: var(--color-border);
+  stroke-width: 1.5;
+}
+
+.rd-box-accent {
+  fill: var(--color-surface);
+  stroke: var(--color-accent);
+  stroke-width: 2;
+}
+
+.rd-box-danger {
+  fill: var(--color-surface);
+  stroke: var(--color-danger);
+  stroke-width: 2;
+}
+
+.rd-fill-accent {
+  fill: var(--color-accent);
+  stroke: none;
+}
+
+.rd-fill-danger {
+  fill: var(--color-danger);
+  stroke: none;
+}
+
+.rd-stroke-danger {
+  fill: none;
+  stroke: var(--color-danger);
+  stroke-width: 2;
+}
+
+.rd-fill-muted {
+  fill: var(--color-text-muted);
+  stroke: none;
+}
+
+.rd-text {
+  fill: var(--color-text);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.rd-text-muted {
+  fill: var(--color-text-muted);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.rd-text-accent {
+  fill: var(--color-accent);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.rd-text-sm {
+  fill: var(--color-text);
+  font-size: 10px;
+  font-family: inherit;
+}
+
+.rd-text-sm-muted {
+  fill: var(--color-text-muted);
+  font-size: 10px;
+  font-family: inherit;
 }
 
 /* Перекрёстные ссылки из калькулятора в справочник */
