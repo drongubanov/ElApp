@@ -387,6 +387,20 @@
         <div class="net-bom-body" id="net-bom-body"></div>
       </details>
 
+      <details class="net-preview" id="network-preview" hidden>
+        <summary class="net-preview-summary">
+          Предпросмотр схемы <span class="net-preview-hint">— как в экспортируемом PDF/DXF</span>
+        </summary>
+        <div class="net-preview-body">
+          <div class="net-preview-toolbar" id="net-preview-toolbar" hidden>
+            <button type="button" id="net-preview-prev" class="net-preview-nav" title="Предыдущий лист" aria-label="Предыдущий лист">‹</button>
+            <span class="net-preview-page" id="net-preview-page" role="status" aria-live="polite"></span>
+            <button type="button" id="net-preview-next" class="net-preview-nav" title="Следующий лист" aria-label="Следующий лист">›</button>
+          </div>
+          <div class="net-preview-stage" id="net-preview-stage"></div>
+        </div>
+      </details>
+
       <div class="net-empty-state" id="net-empty-state">
         <svg class="net-empty-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
           <rect x="9" y="6" width="30" height="36" rx="3" />

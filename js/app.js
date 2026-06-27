@@ -17,6 +17,7 @@ import { diffSchemes, hasDiff } from './schemeDiff.js';
 import { topMostSelectedIds } from './treeSelection.js';
 import { buildSchemeLayout } from './schemeLayout.js';
 import { buildSheet } from './schemeSheet.js';
+import { renderSheetToSvg } from './schemeSvg.js';
 import { buildSchemePdf } from './exportPdf.js';
 import { buildVectorSchemePdf } from './vectorPdf.js';
 import { buildDxf } from './exportDxf.js';
@@ -162,6 +163,12 @@ const exportSpecBtn = document.getElementById('export-spec-btn');
 const exportSpecPdfBtn = document.getElementById('export-spec-pdf-btn');
 const exportSpecPdfVectorBtn = document.getElementById('export-spec-pdf-vector-btn');
 const exportBomBtn = document.getElementById('export-bom-btn');
+const networkPreview = document.getElementById('network-preview');
+const netPreviewStage = document.getElementById('net-preview-stage');
+const netPreviewToolbar = document.getElementById('net-preview-toolbar');
+const netPreviewPageLabel = document.getElementById('net-preview-page');
+const netPreviewPrevBtn = document.getElementById('net-preview-prev');
+const netPreviewNextBtn = document.getElementById('net-preview-next');
 const resetNetworkBtn = document.getElementById('reset-network-btn');
 const netToast = document.getElementById('net-toast');
 const netToastMessage = document.getElementById('net-toast-message');
@@ -3122,6 +3129,7 @@ calcNetworkBtn.addEventListener('click', () => {
   renderPanel();
   renderWarnings();
   renderBom();
+  renderSchemePreview();
   // Сбрасываем, чтобы подсветка проигралась один раз, а не при каждом ререндере.
   changedValueIds = new Set();
 });
@@ -3155,6 +3163,7 @@ function performUndo() {
   renderPanel();
   renderWarnings();
   renderBom();
+  renderSchemePreview();
   renderProjectList();
 }
 
@@ -3321,6 +3330,64 @@ function buildSchemeSheet() {
   });
 }
 
+// Предпросмотр схемы: те же листы, что уходят в экспорт, отрисованные инлайновым
+// SVG прямо на странице. previewSheets — массив листов (на будущее: несколько
+// листов схем по щитам), previewIndex — текущий показанный лист.
+let previewSheets = [];
+let previewIndex = 0;
+
+function renderSchemePreviewPage() {
+  if (!previewSheets.length) {
+    netPreviewStage.innerHTML = '';
+    return;
+  }
+  previewIndex = Math.max(0, Math.min(previewIndex, previewSheets.length - 1));
+  const sheet = previewSheets[previewIndex];
+  const multi = previewSheets.length > 1;
+  netPreviewToolbar.hidden = !multi;
+  if (multi) {
+    netPreviewPageLabel.textContent = `Лист ${previewIndex + 1} из ${previewSheets.length}`;
+    netPreviewPrevBtn.disabled = previewIndex === 0;
+    netPreviewNextBtn.disabled = previewIndex === previewSheets.length - 1;
+  }
+  netPreviewStage.innerHTML = renderSheetToSvg(sheet, {
+    title: `Предпросмотр: ${sheet.title || networkTree?.name || 'схема'}`,
+  });
+}
+
+// Перестраивает листы предпросмотра по текущему дереву и перерисовывает.
+// Показывается только после расчёта (как сводка проверок и спецификация);
+// до него панель скрыта.
+function renderSchemePreview() {
+  if (!networkTree || !lastResultTree) {
+    networkPreview.hidden = true;
+    previewSheets = [];
+    netPreviewStage.innerHTML = '';
+    return;
+  }
+  networkPreview.hidden = false;
+  try {
+    const sheet = buildSchemeSheet();
+    sheet.title = networkTree.name;
+    previewSheets = [sheet];
+    netPreviewStage.classList.remove('is-error');
+    renderSchemePreviewPage();
+  } catch (err) {
+    previewSheets = [];
+    netPreviewStage.classList.add('is-error');
+    netPreviewStage.textContent = `Не удалось построить предпросмотр: ${err.message}`;
+  }
+}
+
+netPreviewPrevBtn.addEventListener('click', () => {
+  previewIndex -= 1;
+  renderSchemePreviewPage();
+});
+netPreviewNextBtn.addEventListener('click', () => {
+  previewIndex += 1;
+  renderSchemePreviewPage();
+});
+
 // Выпадающее меню экспорта: открывается по кнопке, закрывается по выбору
 // пункта, клику вне меню или клавише Esc.
 function setExportMenuOpen(open) {
@@ -3476,6 +3543,7 @@ importProjectInput.addEventListener('change', () => {
     renderPanel();
     renderWarnings();
     renderBom();
+  renderSchemePreview();
     renderProjectList();
   };
   reader.onerror = () => {
@@ -3596,6 +3664,7 @@ resetNetworkBtn.addEventListener('click', () => {
   renderPanel();
   renderWarnings();
   renderBom();
+  renderSchemePreview();
   renderProjectList();
   showUndoToast('Сеть сброшена к схеме по умолчанию.', 'Отменить', performUndo);
 });
@@ -3620,6 +3689,7 @@ openProjectBtn.addEventListener('click', () => {
   renderPanel();
   renderWarnings();
   renderBom();
+  renderSchemePreview();
   renderProjectList();
 });
 
