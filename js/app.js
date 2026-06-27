@@ -3375,14 +3375,16 @@ function renderSchemePreview() {
     // Лист 1 — обзорная схема всего дерева; далее — полноценные схемы по щитам.
     const overview = buildSchemeSheet();
     overview.previewLabel = 'обзор сети';
-    const nodeSheets = buildNodeSheets(networkTree, {
-      title: networkTree.name,
-      date: formatDateTime(Date.now()),
-    });
+    const meta = { title: networkTree.name, date: formatDateTime(Date.now()) };
+    const nodeSheets = buildNodeSheets(networkTree, meta);
     nodeSheets.forEach((s) => {
       s.previewLabel = `щит: ${s.title}`;
     });
-    previewSheets = [overview, ...nodeSheets];
+    const specSheets = buildSpecSheets(networkTree, meta);
+    specSheets.forEach((s, i) => {
+      s.previewLabel = specSheets.length > 1 ? `спецификация (лист ${i + 1})` : 'спецификация оборудования и кабелей';
+    });
+    previewSheets = [overview, ...nodeSheets, ...specSheets];
     netPreviewStage.classList.remove('is-error');
     renderSchemePreviewPage();
   } catch (err) {
@@ -3462,12 +3464,12 @@ exportDxfBtn.addEventListener('click', () => {
   }
 });
 
-// Полноценные однолинейные схемы по каждому щиту (отдельный лист на щит).
+// Полноценные однолинейные схемы по каждому щиту (отдельный лист на щит) с
+// обязательно приложенной спецификацией оборудования и кабелей (ведомость линий
+// сети — на отдельных листах после схем).
 function buildNodeSheetSet() {
-  return buildNodeSheets(networkTree, {
-    title: networkTree.name,
-    date: formatDateTime(Date.now()),
-  });
+  const meta = { title: networkTree.name, date: formatDateTime(Date.now()) };
+  return [...buildNodeSheets(networkTree, meta), ...buildSpecSheets(networkTree, meta)];
 }
 
 exportNodesPdfBtn.addEventListener('click', () => {

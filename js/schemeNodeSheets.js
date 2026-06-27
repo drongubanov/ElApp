@@ -54,15 +54,15 @@ function renderPanelSheet(diagram, meta, pageNo, totalPages, panelTitle) {
   const { sheet, scale } = chooseSheet(diagram);
   const segments = [];
   const texts = [];
-  const seg = (x1, y1, x2, y2, weight = 0.25, layer = 'SCHEME') => segments.push({ x1, y1, x2, y2, weight, layer });
-  const rect = (x, y, w, h, weight, layer) => {
-    seg(x, y, x + w, y, weight, layer);
-    seg(x + w, y, x + w, y + h, weight, layer);
-    seg(x + w, y + h, x, y + h, weight, layer);
-    seg(x, y + h, x, y, weight, layer);
+  const seg = (x1, y1, x2, y2, weight = 0.25, layer = 'SCHEME', color) => segments.push({ x1, y1, x2, y2, weight, layer, ...(color ? { color } : {}) });
+  const rect = (x, y, w, h, weight, layer, color) => {
+    seg(x, y, x + w, y, weight, layer, color);
+    seg(x + w, y, x + w, y + h, weight, layer, color);
+    seg(x + w, y + h, x, y + h, weight, layer, color);
+    seg(x, y + h, x, y, weight, layer, color);
   };
-  const text = (x, y, value, h, halign, valign, layer = 'TEXT') =>
-    texts.push({ x, y, text: String(value), h, halign, valign, layer });
+  const text = (x, y, value, h, halign, valign, layer = 'TEXT', color) =>
+    texts.push({ x, y, text: String(value), h, halign, valign, layer, ...(color ? { color } : {}) });
 
   // Рамка чертежа.
   rect(FRAME.left, FRAME.top, sheet.w - FRAME.left - FRAME.right, sheet.h - FRAME.top - FRAME.bottom, 0.7, 'FRAME');
@@ -77,10 +77,25 @@ function renderPanelSheet(diagram, meta, pageNo, totalPages, panelTitle) {
   const tx = (x) => offX + x * scale;
   const ty = (y) => offY + y * scale;
 
-  diagram.segments.forEach((s) => seg(tx(s.x1), ty(s.y1), tx(s.x2), ty(s.y2), s.weight * Math.max(scale, 0.5), 'SCHEME'));
+  diagram.segments.forEach((s) => seg(tx(s.x1), ty(s.y1), tx(s.x2), ty(s.y2), s.weight * Math.max(scale, 0.5), 'SCHEME', s.color));
   diagram.texts.forEach((t) =>
-    text(tx(t.x), ty(t.y), t.text, Math.max(1.6, t.h * scale), t.halign, t.valign, 'TEXT'),
+    text(tx(t.x), ty(t.y), t.text, Math.max(1.6, t.h * scale), t.halign, t.valign, 'TEXT', t.color),
   );
+
+  // Легенда цветовой маркировки проводников (ГОСТ Р 50462 / ПУЭ) — в правом
+  // верхнем углу поля чертежа, фиксированным размером (не масштабируется).
+  if (diagram.conductors?.length) {
+    const legendW = 34;
+    const lx = sheet.w - FRAME.right - legendW - 2;
+    let ly = FRAME.top + 4;
+    text(lx, ly, 'Проводники:', 2.4, 'left', 'middle', 'TEXT');
+    ly += 4.5;
+    diagram.conductors.forEach((c) => {
+      seg(lx, ly, lx + 6, ly, 0.9, 'SCHEME', c.color);
+      text(lx + 8, ly, c.label, 2.4, 'left', 'middle', 'TEXT', c.color);
+      ly += 4;
+    });
+  }
 
   addTitleBlock({
     sheet,
