@@ -17,6 +17,7 @@ import { diffSchemes, hasDiff } from './schemeDiff.js';
 import { topMostSelectedIds } from './treeSelection.js';
 import { buildSchemeLayout } from './schemeLayout.js';
 import { buildSheet } from './schemeSheet.js';
+import { buildNodeSheets, mergeSheetsForDxf } from './schemeNodeSheets.js';
 import { renderSheetToSvg } from './schemeSvg.js';
 import { buildSchemePdf } from './exportPdf.js';
 import { buildVectorSchemePdf } from './vectorPdf.js';
@@ -163,6 +164,9 @@ const exportSpecBtn = document.getElementById('export-spec-btn');
 const exportSpecPdfBtn = document.getElementById('export-spec-pdf-btn');
 const exportSpecPdfVectorBtn = document.getElementById('export-spec-pdf-vector-btn');
 const exportBomBtn = document.getElementById('export-bom-btn');
+const exportNodesPdfBtn = document.getElementById('export-nodes-pdf-btn');
+const exportNodesPdfVectorBtn = document.getElementById('export-nodes-pdf-vector-btn');
+const exportNodesDxfBtn = document.getElementById('export-nodes-dxf-btn');
 const networkPreview = document.getElementById('network-preview');
 const netPreviewStage = document.getElementById('net-preview-stage');
 const netPreviewToolbar = document.getElementById('net-preview-toolbar');
@@ -3346,12 +3350,13 @@ function renderSchemePreviewPage() {
   const multi = previewSheets.length > 1;
   netPreviewToolbar.hidden = !multi;
   if (multi) {
-    netPreviewPageLabel.textContent = `Лист ${previewIndex + 1} из ${previewSheets.length}`;
+    const label = sheet.previewLabel || sheet.title || '';
+    netPreviewPageLabel.textContent = `${previewIndex + 1} / ${previewSheets.length}${label ? ' — ' + label : ''}`;
     netPreviewPrevBtn.disabled = previewIndex === 0;
     netPreviewNextBtn.disabled = previewIndex === previewSheets.length - 1;
   }
   netPreviewStage.innerHTML = renderSheetToSvg(sheet, {
-    title: `Предпросмотр: ${sheet.title || networkTree?.name || 'схема'}`,
+    title: `Предпросмотр: ${sheet.previewLabel || sheet.title || networkTree?.name || 'схема'}`,
   });
 }
 
@@ -3367,9 +3372,17 @@ function renderSchemePreview() {
   }
   networkPreview.hidden = false;
   try {
-    const sheet = buildSchemeSheet();
-    sheet.title = networkTree.name;
-    previewSheets = [sheet];
+    // Лист 1 — обзорная схема всего дерева; далее — полноценные схемы по щитам.
+    const overview = buildSchemeSheet();
+    overview.previewLabel = 'обзор сети';
+    const nodeSheets = buildNodeSheets(networkTree, {
+      title: networkTree.name,
+      date: formatDateTime(Date.now()),
+    });
+    nodeSheets.forEach((s) => {
+      s.previewLabel = `щит: ${s.title}`;
+    });
+    previewSheets = [overview, ...nodeSheets];
     netPreviewStage.classList.remove('is-error');
     renderSchemePreviewPage();
   } catch (err) {
@@ -3446,6 +3459,47 @@ exportDxfBtn.addEventListener('click', () => {
     networkErrorMessage.textContent = '';
   } catch (err) {
     networkErrorMessage.textContent = `Не удалось построить DXF: ${err.message}`;
+  }
+});
+
+// Полноценные однолинейные схемы по каждому щиту (отдельный лист на щит).
+function buildNodeSheetSet() {
+  return buildNodeSheets(networkTree, {
+    title: networkTree.name,
+    date: formatDateTime(Date.now()),
+  });
+}
+
+exportNodesPdfBtn.addEventListener('click', () => {
+  if (!networkTree) return;
+  try {
+    const blob = buildSchemePdf(buildNodeSheetSet());
+    downloadBlob(blob, `${sanitizeFileName(networkTree.name)} — схемы по щитам.pdf`);
+    networkErrorMessage.textContent = '';
+  } catch (err) {
+    networkErrorMessage.textContent = `Не удалось построить схемы по щитам: ${err.message}`;
+  }
+});
+
+exportNodesPdfVectorBtn.addEventListener('click', async () => {
+  if (!networkTree) return;
+  try {
+    const blob = await buildVectorSchemePdf(buildNodeSheetSet());
+    downloadBlob(blob, `${sanitizeFileName(networkTree.name)} — схемы по щитам (вектор).pdf`);
+    networkErrorMessage.textContent = '';
+  } catch (err) {
+    networkErrorMessage.textContent = `Не удалось построить векторные схемы по щитам: ${err.message}`;
+  }
+});
+
+exportNodesDxfBtn.addEventListener('click', () => {
+  if (!networkTree) return;
+  try {
+    const dxf = buildDxf(mergeSheetsForDxf(buildNodeSheetSet()));
+    downloadBlob(new Blob([dxf], { type: 'application/dxf' }), `${sanitizeFileName(networkTree.name)} — схемы по щитам.dxf`);
+    networkErrorMessage.textContent = '';
+  } catch (err) {
+    networkErrorMessage.textContent = `Не удалось построить DXF схем по щитам: ${err.message}`;
   }
 });
 
