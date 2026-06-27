@@ -21,11 +21,10 @@ export function renderSheetToCanvas(sheet) {
 
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = '#000000';
-  ctx.fillStyle = '#000000';
   ctx.lineCap = 'round';
 
   sheet.segments.forEach((s) => {
+    ctx.strokeStyle = s.color || '#000000';
     ctx.lineWidth = Math.max(1, s.weight * PX_PER_MM);
     ctx.beginPath();
     ctx.moveTo(s.x1 * PX_PER_MM, s.y1 * PX_PER_MM);
@@ -34,6 +33,7 @@ export function renderSheetToCanvas(sheet) {
   });
 
   sheet.texts.forEach((t) => {
+    ctx.fillStyle = t.color || '#000000';
     ctx.font = `${t.h * PX_PER_MM}px Arial, sans-serif`;
     ctx.textAlign = CANVAS_HALIGN[t.halign] ?? 'left';
     ctx.textBaseline = CANVAS_VALIGN[t.valign] ?? 'alphabetic';

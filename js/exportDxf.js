@@ -38,6 +38,14 @@ function encodeText(value) {
 const HALIGN = { left: 0, center: 1, right: 2 };
 const VALIGN = { baseline: 0, bottom: 1, middle: 2, top: 3 };
 
+// 24-битный «истинный цвет» DXF (группа 420) из HEX. Современные CAD (AutoCAD
+// 2004+ и совместимые) отображают точный цвет; читатели, игнорирующие группу,
+// используют цвет слоя (чёрный) — линия не теряется, лишь без цвета.
+function trueColor(hex) {
+  if (typeof hex !== 'string' || !/^#?[0-9a-f]{6}$/i.test(hex)) return null;
+  return parseInt(hex.replace('#', ''), 16);
+}
+
 export function buildDxf(sheet) {
   const out = [];
   const pair = (code, value) => out.push(String(code), String(value));
@@ -79,6 +87,8 @@ export function buildDxf(sheet) {
   sheet.segments.forEach((s) => {
     pair(0, 'LINE');
     pair(8, s.layer);
+    const sColor = trueColor(s.color);
+    if (sColor != null) pair(420, sColor);
     pair(370, lineWeightCode(s.weight));
     pair(10, num(s.x1));
     pair(20, num(fy(s.y1)));
@@ -89,6 +99,8 @@ export function buildDxf(sheet) {
   sheet.texts.forEach((t) => {
     pair(0, 'TEXT');
     pair(8, t.layer);
+    const tColor = trueColor(t.color);
+    if (tColor != null) pair(420, tColor);
     pair(10, num(t.x));
     pair(20, num(fy(t.y)));
     pair(40, num(t.h));

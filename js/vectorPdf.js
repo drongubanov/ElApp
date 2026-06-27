@@ -47,6 +47,21 @@ function buildToUnicodeCMap(gidToUnicode) {
   );
 }
 
+// PDF-оператор задания цвета (обводки RG или заливки rg) из HEX; без цвета —
+// чёрный. Значения компонент в диапазоне 0..1.
+function colorOp(hex, op) {
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (typeof hex === 'string' && /^#?[0-9a-f]{6}$/i.test(hex)) {
+    const h = hex.replace('#', '');
+    r = parseInt(h.slice(0, 2), 16) / 255;
+    g = parseInt(h.slice(2, 4), 16) / 255;
+    b = parseInt(h.slice(4, 6), 16) / 255;
+  }
+  return `${r.toFixed(3)} ${g.toFixed(3)} ${b.toFixed(3)} ${op}`;
+}
+
 /** Строит поток содержимого одной страницы: линии и текст в PDF-операторах. */
 function buildPageContent(sheet, font) {
   const pageHPt = sheet.h * PT_PER_MM;
@@ -55,20 +70,32 @@ function buildPageContent(sheet, font) {
 
   const lines = [];
   let lastWeightPt = null;
+  let lastStroke = null;
   sheet.segments.forEach((s) => {
     const weightPt = s.weight * PT_PER_MM;
     if (weightPt !== lastWeightPt) {
       lines.push(`${weightPt.toFixed(3)} w`);
       lastWeightPt = weightPt;
     }
+    const stroke = colorOp(s.color, 'RG');
+    if (stroke !== lastStroke) {
+      lines.push(stroke);
+      lastStroke = stroke;
+    }
     lines.push(`${toX(s.x1)} ${toY(s.y1)} m`);
     lines.push(`${toX(s.x2)} ${toY(s.y2)} l`);
     lines.push('S');
   });
 
+  let lastFill = null;
   sheet.texts.forEach((t) => {
     const gids = glyphsForText(font, t.text);
     if (!gids.length) return;
+    const fill = colorOp(t.color, 'rg');
+    if (fill !== lastFill) {
+      lines.push(fill);
+      lastFill = fill;
+    }
     const fontSizePt = t.h * PT_PER_MM;
     const scale = fontSizePt / font.unitsPerEm;
     const ascentPt = font.ascender * scale;

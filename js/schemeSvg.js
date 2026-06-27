@@ -48,7 +48,7 @@ export function renderSheetToSvg(sheet, opts = {}) {
     const w = Math.max(0.12, Number(s.weight) || 0.25);
     parts.push(
       `<line x1="${fmt(s.x1)}" y1="${fmt(s.y1)}" x2="${fmt(s.x2)}" y2="${fmt(s.y2)}" ` +
-        `stroke="${INK}" stroke-width="${fmt(w)}" stroke-linecap="round" />`,
+        `stroke="${s.color || INK}" stroke-width="${fmt(w)}" stroke-linecap="round" />`,
     );
   });
 
@@ -57,7 +57,7 @@ export function renderSheetToSvg(sheet, opts = {}) {
     const baseline = BASELINE[t.valign] || 'alphabetic';
     parts.push(
       `<text x="${fmt(t.x)}" y="${fmt(t.y)}" font-size="${fmt(t.h)}" font-family="Arial, sans-serif" ` +
-        `text-anchor="${anchor}" dominant-baseline="${baseline}" fill="${INK}">${escapeXml(t.text)}</text>`,
+        `text-anchor="${anchor}" dominant-baseline="${baseline}" fill="${t.color || INK}">${escapeXml(t.text)}</text>`,
     );
   });
 
