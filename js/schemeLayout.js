@@ -12,6 +12,23 @@ export const BOX_W = 56;
 export const BOX_H = 24;
 const H_GAP = 16;
 const V_GAP = 28;
+const BOX_W_MAX = 120; // верхний предел ширины блока — очень длинные названия усекаются масштабом, а не растягивают лист бесконечно
+const BOX_PAD = 6; // суммарный горизонтальный отступ текста от границ блока, мм
+
+// Оценка ширины блока (мм) по самой длинной его подписи, чтобы длинное название
+// щита не вылезало за рамку блока. Текст в блоке schemeSheet рисует высотой
+// ≈2,4 мм (первая строка — название — чуть крупнее), средняя ширина символа
+// шрифта Arial ≈0,52 высоты; берётся наибольшая строка плюс отступы, но не уже
+// базовой ширины BOX_W и не шире BOX_W_MAX. Та же модель размера, что и при
+// отрисовке листа, поэтому блок и его текст масштабируются согласованно.
+function boxWidthForLines(lines) {
+  const estimate = (line, fontH) => line.length * fontH * 0.58 + BOX_PAD;
+  let width = BOX_W;
+  lines.forEach((line, idx) => {
+    width = Math.max(width, estimate(line, idx === 0 ? 2.52 : 2.4));
+  });
+  return Math.min(width, BOX_W_MAX);
+}
 
 const NETWORK_TYPE_LABEL = {
   [NETWORK_TYPES.DC]: '⎓',
@@ -33,34 +50,39 @@ function edgeLines(calc) {
   if (!calc || calc.error || !calc.protection) return [];
   const lines = [calc.protection.breaker ? `QF ${calc.protection.breaker} А` : 'QF — вне диапазона'];
   const cable = calc.protection.copperCable
-    ? `Cu ${calc.protection.copperCable.section} мм2`
+    ? `Cu ${calc.protection.copperCable.section} мм²`
     : calc.protection.aluminumCable
-      ? `Al ${calc.protection.aluminumCable.section} мм2`
+      ? `Al ${calc.protection.aluminumCable.section} мм²`
       : null;
   if (cable) lines.push(cable);
   return lines;
 }
 
-function computeWidths(node, widths) {
+// Ширина поддерева (для раскладки) считается с учётом фактической ширины блока
+// узла (boxWidths), а не фиксированной BOX_W — иначе широкие блоки с длинными
+// названиями накладывались бы на соседей.
+function computeWidths(node, widths, boxWidths) {
+  const boxW = boxWidths.get(node.id);
   if (!node.children.length) {
-    widths.set(node.id, BOX_W);
-    return BOX_W;
+    widths.set(node.id, boxW);
+    return boxW;
   }
-  const sum = node.children.reduce((acc, child) => acc + computeWidths(child, widths), 0) + H_GAP * (node.children.length - 1);
-  const width = Math.max(sum, BOX_W);
+  const sum = node.children.reduce((acc, child) => acc + computeWidths(child, widths, boxWidths), 0) + H_GAP * (node.children.length - 1);
+  const width = Math.max(sum, boxW);
   widths.set(node.id, width);
   return width;
 }
 
-function place(node, left, top, widths, calcMap, boxes, edges) {
+function place(node, left, top, widths, boxWidths, calcMap, boxes, edges) {
   const width = widths.get(node.id);
   const cx = left + width / 2;
+  const boxW = boxWidths.get(node.id);
   const calc = calcMap.get(node.id);
   boxes.push({
     id: node.id,
-    x: cx - BOX_W / 2,
+    x: cx - boxW / 2,
     y: top,
-    w: BOX_W,
+    w: boxW,
     h: BOX_H,
     lines: nodeBoxLines(node, calc),
     hasError: Boolean(calc?.error),
@@ -72,7 +94,7 @@ function place(node, left, top, widths, calcMap, boxes, edges) {
   node.children.forEach((child) => {
     const childWidth = widths.get(child.id);
     const childCx = childLeft + childWidth / 2;
-    place(child, childLeft, childTop, widths, calcMap, boxes, edges);
+    place(child, childLeft, childTop, widths, boxWidths, calcMap, boxes, edges);
     edges.push({
       points: [
         { x: cx, y: top + BOX_H },
@@ -115,12 +137,21 @@ export function buildSchemeLayout(tree) {
   const calcMap = new Map();
   flattenCalc(calcTree, calcMap);
 
+  // Фактическая ширина каждого блока — по его подписям (название/параметры),
+  // чтобы длинные названия щитов не вылезали за рамку блока.
+  const boxWidths = new Map();
+  const collectBoxWidths = (node) => {
+    boxWidths.set(node.id, boxWidthForLines(nodeBoxLines(node, calcMap.get(node.id))));
+    node.children.forEach(collectBoxWidths);
+  };
+  collectBoxWidths(tree);
+
   const widths = new Map();
-  computeWidths(tree, widths);
+  computeWidths(tree, widths, boxWidths);
 
   const boxes = [];
   const edges = [];
-  place(tree, 0, V_GAP, widths, calcMap, boxes, edges);
+  place(tree, 0, V_GAP, widths, boxWidths, calcMap, boxes, edges);
 
   const root = boxes[0];
   const rootCx = root.x + root.w / 2;
